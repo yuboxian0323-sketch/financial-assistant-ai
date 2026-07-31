@@ -36,6 +36,7 @@ export interface SessionBrief {
 }
 export interface DatabaseInfo { version: number; seedVersion: number; companyCount: number }
 export type KnowledgeSection = 'Overview' | 'AI Summary' | 'Notes' | 'Research' | 'Reports' | 'News' | 'Events' | 'Timeline' | 'Conversations' | 'Bull Thesis' | 'Bear Thesis' | 'Financials';
+export type CompanyHubPage = 'Workspace' | 'Overview' | 'News' | 'Automations';
 
 export class AppError extends Error {
   constructor(public readonly code: 'DATABASE' | 'NOT_FOUND' | 'SERVICE', message: string, public readonly retryable = true) {

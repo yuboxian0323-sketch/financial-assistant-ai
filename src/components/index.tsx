@@ -45,8 +45,8 @@ export function WidgetContainer({ title, children, loading, empty, error, onRetr
   return <View style={styles.widget}><SectionHeader title={title} />{loading ? <LoadingSkeleton preset="card" /> : error ? <EmptyState title="Couldn’t load this section" description={error.message} actionLabel="Try again" onAction={onRetry} /> : empty ? <EmptyState title="Nothing here yet" description="This section is ready for your research." /> : children}</View>;
 }
 
-export function NewsCard({ headline, summary, timestamp, company, important }: { headline: string; summary: string; timestamp: string; company?: string; important?: boolean }) {
-  return <Card><View style={styles.badges}>{company && <Tag label={company} />}{important && <Tag label="Important" tone="warning" />}</View><Text style={styles.label}>{headline}</Text><Text style={styles.body}>{summary}</Text><Text style={styles.caption}>{new Date(timestamp).toLocaleDateString()}</Text></Card>;
+export function NewsCard({ headline, summary, timestamp, company, important, onPress }: { headline: string; summary: string; timestamp: string; company?: string; important?: boolean; onPress?: () => void }) {
+  return <Card onPress={onPress}><View style={styles.badges}>{company && <Tag label={company} />}{important && <Tag label="Important" tone="warning" />}</View><Text style={styles.label}>{headline}</Text><Text style={styles.body}>{summary}</Text><Text style={styles.caption}>{new Date(timestamp).toLocaleDateString()}</Text></Card>;
 }
 
 export function SummaryCard({ title, summary, metric, emphasis }: { title: string; summary: string; metric?: string; emphasis?: boolean }) {
