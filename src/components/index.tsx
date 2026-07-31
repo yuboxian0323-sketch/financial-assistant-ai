@@ -3,7 +3,8 @@ import {
   ActivityIndicator, Modal as NativeModal, Pressable, ScrollView, StyleSheet, Text, TextInput,
   type TextInputProps, type ViewStyle, View,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { theme } from '@/theme';
@@ -18,8 +19,10 @@ export function Card({ children, onPress, disabled, elevated, padding = 'lg', lo
 type ButtonProps = { label: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'ghost'; size?: 'small' | 'medium'; loading?: boolean; disabled?: boolean; icon?: keyof typeof Ionicons.glyphMap };
 export function Button({ label, onPress, variant = 'primary', size = 'medium', loading, disabled, icon }: ButtonProps) {
   const scale = useSharedValue(1);
+  const reduceMotion = useReducedMotion();
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return <Animated.View style={animated}><Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} onPressIn={() => { scale.value = withTiming(0.97, { duration: theme.motion.fast }); }} onPressOut={() => { scale.value = withTiming(1, { duration: theme.motion.fast }); }} style={[styles.button, styles[`button_${variant}`], size === 'small' && styles.buttonSmall, (disabled || loading) && styles.disabled]}>{loading ? <ActivityIndicator color={theme.colors.text} /> : <>{icon && <Ionicons name={icon} size={18} color={variant === 'primary' ? theme.colors.background : theme.colors.text} />}<Text style={[styles.buttonText, variant === 'primary' && styles.buttonTextPrimary]}>{label}</Text></>}</Pressable></Animated.View>;
+  const duration = reduceMotion ? 0 : theme.motion.fast;
+  return <Animated.View style={animated}><Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} onPressIn={() => { scale.value = withTiming(0.97, { duration }); }} onPressOut={() => { scale.value = withTiming(1, { duration }); }} style={[styles.button, styles[`button_${variant}`], size === 'small' && styles.buttonSmall, (disabled || loading) && styles.disabled]}>{loading ? <ActivityIndicator color={theme.colors.text} /> : <>{icon && <Ionicons name={icon} size={18} color={variant === 'primary' ? theme.colors.background : theme.colors.text} />}<Text style={[styles.buttonText, variant === 'primary' && styles.buttonTextPrimary]}>{label}</Text></>}</Pressable></Animated.View>;
 }
 
 export function SectionHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
@@ -65,7 +68,14 @@ export function AppModal({ visible, title, onClose, children }: PropsWithChildre
 
 export function BottomSheet({ visible, title, onClose, children }: PropsWithChildren<{ visible: boolean; title: string; onClose: () => void }>) {
   const insets = useSafeAreaInsets();
-  return <NativeModal transparent animationType="slide" visible={visible} onRequestClose={onClose}><Pressable accessibilityLabel="Dismiss bottom sheet" style={styles.sheetBackdrop} onPress={onClose}><Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, theme.spacing.lg) }]}><View style={styles.handle} /><SectionHeader title={title} action={<Pressable accessibilityLabel="Close bottom sheet" onPress={onClose}><Ionicons name="close" size={24} color={theme.colors.text} /></Pressable>} />{children}</Pressable></Pressable></NativeModal>;
+  const translateY = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  const pan = Gesture.Pan().onUpdate((event) => { translateY.value = Math.max(0, event.translationY); }).onEnd(() => {
+    if (translateY.value > 80) runOnJS(onClose)();
+    else translateY.value = withTiming(0, { duration: reduceMotion ? 0 : theme.motion.normal });
+  });
+  return <NativeModal transparent animationType={reduceMotion ? 'none' : 'slide'} visible={visible} onRequestClose={onClose}><Pressable accessibilityLabel="Dismiss bottom sheet" style={styles.sheetBackdrop} onPress={onClose}><GestureDetector gesture={pan}><Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, theme.spacing.lg) }, animatedStyle]}><Pressable onPress={(event) => event.stopPropagation()}><View style={styles.handle} /><SectionHeader title={title} action={<Pressable accessibilityLabel="Close bottom sheet" onPress={onClose}><Ionicons name="close" size={24} color={theme.colors.text} /></Pressable>} />{children}</Pressable></Animated.View></GestureDetector></Pressable></NativeModal>;
 }
 
 export function Tag({ label, tone = 'default' }: { label: string; tone?: 'default' | 'warning' | 'positive' }) {
