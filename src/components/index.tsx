@@ -88,7 +88,9 @@ export function Divider({ inset = 0, vertical }: { inset?: number; vertical?: bo
   return <View style={vertical ? [styles.dividerVertical, { marginVertical: inset }] : [styles.divider, { marginHorizontal: inset }]} />;
 }
 export function ProgressIndicator({ value, label }: { value?: number; label?: string }) {
-  return <View accessibilityRole="progressbar" accessibilityValue={value === undefined ? undefined : { min: 0, max: 1, now: value }}><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.max(0, Math.min(1, value ?? 0.42)) * 100}%` }]} /></View>{label && <Text style={styles.caption}>{label}</Text>}</View>;
+  const normalizedValue = Math.max(0, Math.min(1, value ?? 0.42));
+  const percentage = Math.round(normalizedValue * 100);
+  return <View accessible accessibilityRole="progressbar" accessibilityValue={value === undefined ? undefined : { min: 0, max: 100, now: percentage }}><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${percentage}%` }]} /></View>{label && <Text style={styles.caption}>{label}</Text>}</View>;
 }
 
 export function Screen({ title, subtitle, children, scroll = true }: PropsWithChildren<{ title: string; subtitle?: string; scroll?: boolean }>) {
