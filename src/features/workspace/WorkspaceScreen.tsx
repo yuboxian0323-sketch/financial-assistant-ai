@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
-import { Button, Card, Pill, ProgressIndicator, Screen, SectionHeader, StockRow, SummaryCard, Tag, WidgetContainer } from '@/components';
+import { View } from 'react-native';
+import { AppText, Button, Card, Pill, ProgressIndicator, Screen, SectionHeader, StockRow, SummaryCard, Tag, WidgetContainer } from '@/components';
 import { useCompanies, usePortfolio } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
 
@@ -14,10 +14,10 @@ export function WorkspaceScreen() {
       {companies.data?.slice(0, 3).map((company) => <StockRow key={company.id} ticker={company.ticker} name={company.name} price={company.price} change={company.dailyChange} onPress={() => router.push(`/company/${company.id}`)} />)}
     </WidgetContainer>
     <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-      <Card style={{ flex: 1 }}><Tag label="Research" /><Text style={{ ...theme.type.title, color: theme.colors.text }}>7</Text><Text style={{ ...theme.type.caption, color: theme.colors.textSecondary }}>Companies tracked</Text></Card>
-      <Card style={{ flex: 1 }}><Tag label="Portfolio" /><Text style={{ ...theme.type.title, color: theme.colors.text }}>{portfolio.data?.length ?? '—'}</Text><Text style={{ ...theme.type.caption, color: theme.colors.textSecondary }}>Core positions</Text></Card>
+      <Card style={{ flex: 1 }}><Tag label="Research" /><AppText variant="title">7</AppText><AppText variant="caption" tone="secondary">Companies tracked</AppText></Card>
+      <Card style={{ flex: 1 }}><Tag label="Portfolio" /><AppText variant="title">{portfolio.data?.length ?? '—'}</AppText><AppText variant="caption" tone="secondary">Core positions</AppText></Card>
     </View>
     <Card><SectionHeader title="Research readiness" subtitle="Sample workspace widget" /><ProgressIndicator value={0.72} label="72% of open questions reviewed" /></Card>
-    <Card><SectionHeader title="Workspace architecture" subtitle="Layout only—company data stays canonical" /><Text style={{ ...theme.type.body, color: theme.colors.textSecondary }}>Future versions can pin, resize, hide, and rearrange widgets without copying company knowledge.</Text><Button label="Customize soon" variant="secondary" disabled onPress={() => undefined} /></Card>
+    <Card><SectionHeader title="Workspace architecture" subtitle="Layout only—company data stays canonical" /><AppText tone="secondary">Future versions can pin, resize, hide, and rearrange widgets without copying company knowledge.</AppText><Button label="Customize soon" variant="secondary" disabled /></Card>
   </Screen>;
 }

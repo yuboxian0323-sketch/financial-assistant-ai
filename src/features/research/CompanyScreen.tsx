@@ -1,12 +1,13 @@
 import { useLocalSearchParams } from 'expo-router';
-import { ScrollView, Text, View } from 'react-native';
-import { Button, Card, EmptyState, LoadingSkeleton, NewsCard, Pill, Screen, SectionHeader, SummaryCard, Tag } from '@/components';
+import { ScrollView, View } from 'react-native';
+import { AppText, Button, Card, EmptyState, LoadingSkeleton, NewsCard, Pill, Screen, SectionHeader, SummaryCard, Tag } from '@/components';
 import { useCompany, useCompanyContent } from '@/hooks/useAppQueries';
 import { useUIStore } from '@/features/ui/store';
 import type { Company, CompanyContent, CompanyHubPage } from '@/types/domain';
 import { theme } from '@/theme';
 
 const pages: CompanyHubPage[] = ['Workspace', 'Overview', 'News', 'Automations'];
+const newsFilters = ['All', 'Company', 'Industry', 'Financial', 'Products', 'Management', 'Macro', 'AI Summary'];
 const overviewGroups = [
   { title: 'Company', body: 'Description, headquarters, leadership, employees, and founding history.' },
   { title: 'Business', body: 'Business model, products, services, customers, and suppliers.' },
@@ -22,9 +23,9 @@ const overviewGroups = [
 
 export function CompanyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const storedPage = useUIStore((state) => state.expandedCard);
+  const storedPage = useUIStore((state) => state.companyHubPage);
   const selected: CompanyHubPage = pages.includes(storedPage as CompanyHubPage) ? storedPage as CompanyHubPage : 'Workspace';
-  const select = useUIStore((state) => state.setExpandedCard);
+  const select = useUIStore((state) => state.setCompanyHubPage);
   const company = useCompany(id);
   const news = useCompanyContent(id, 'news');
   if (company.isLoading) return <Screen title="Company Hub"><LoadingSkeleton preset="card" /><LoadingSkeleton preset="card" /></Screen>;
@@ -48,7 +49,7 @@ function CompanyWorkspace({ company, newsCount }: { company: Company; newsCount:
       <View style={{ flex: 1 }}><SummaryCard title="News" metric={String(newsCount)} summary="Sample tracked stories" /></View>
     </View>
     {company.financials.slice(0, 2).map((metric) => <SummaryCard key={metric.label} title={metric.label} metric={metric.value} summary="Referenced from the canonical Overview." />)}
-    <Card><Tag label="Customizable layout" /><Text style={{ ...theme.type.body, color: theme.colors.textSecondary }}>Drag, resize, pin, and hide controls are intentionally reserved for a future milestone.</Text></Card>
+    <Card><Tag label="Customizable layout" /><AppText tone="secondary">Drag, resize, pin, and hide controls are intentionally reserved for a future milestone.</AppText></Card>
   </View>;
 }
 
@@ -58,18 +59,18 @@ function CompanyOverview({ company }: { company: Company }) {
     <SummaryCard title="Company description" summary={company.overview} />
     <SectionHeader title="Financials" />
     {company.financials.map((metric) => <SummaryCard key={metric.label} title={metric.label} metric={metric.value} summary="Representative placeholder metric." />)}
-    {overviewGroups.map((group) => <Card key={group.title}><Text style={{ ...theme.type.heading, color: theme.colors.text }}>{group.title}</Text><Text style={{ ...theme.type.body, color: theme.colors.textSecondary }}>{group.body}</Text></Card>)}
-    <Card><Tag label="Bull thesis" tone="positive" /><Text style={{ ...theme.type.body, color: theme.colors.text }}>{company.bullThesis}</Text></Card>
-    <Card><Tag label="Bear thesis" tone="warning" /><Text style={{ ...theme.type.body, color: theme.colors.text }}>{company.bearThesis}</Text></Card>
+    {overviewGroups.map((group) => <Card key={group.title}><AppText variant="heading">{group.title}</AppText><AppText tone="secondary">{group.body}</AppText></Card>)}
+    <Card><Tag label="Bull thesis" tone="positive" /><AppText>{company.bullThesis}</AppText></Card>
+    <Card><Tag label="Bear thesis" tone="warning" /><AppText>{company.bearThesis}</AppText></Card>
   </View>;
 }
 
 function CompanyNews({ ticker, loading, error, items, retry }: { ticker: string; loading: boolean; error: Error | null; items: CompanyContent[]; retry: () => void }) {
   if (loading) return <LoadingSkeleton preset="card" />;
   if (error) return <EmptyState title="News unavailable" description={error.message} actionLabel="Try again" onAction={retry} />;
-  return <View style={{ gap: theme.spacing.md }}><SectionHeader title="News" subtitle="Everything that changes over time" /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.sm }}>{['All', 'Company', 'Industry', 'Financial', 'Products', 'Management', 'Macro', 'AI Summary'].map((filter, index) => <Pill key={filter} label={filter} selected={index === 0} />)}</ScrollView>{items.length ? items.map((item) => <NewsCard key={item.id} headline={item.title} summary={item.body} timestamp={item.occurredAt} company={ticker} important={item.importance >= 3} />) : <EmptyState title="No news yet" description="Changing company information will appear here." />}</View>;
+  return <View style={{ gap: theme.spacing.md }}><SectionHeader title="News" subtitle="Everything that changes over time" /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.sm }}>{newsFilters.map((filter, index) => <Pill key={filter} label={filter} selected={index === 0} />)}</ScrollView>{items.length ? items.map((item) => <NewsCard key={item.id} headline={item.title} summary={item.body} timestamp={item.occurredAt} company={ticker} important={item.importance >= 3} />) : <EmptyState title="No news yet" description="Changing company information will appear here." />}</View>;
 }
 
 function CompanyAutomations({ companyName, ticker }: { companyName: string; ticker: string }) {
-  return <View style={{ gap: theme.spacing.md }}><SectionHeader title="Automations" subtitle={`Future continuous monitoring for ${companyName}`} /><Card elevated><Tag label="AI monitoring placeholder" /><Text style={{ ...theme.type.heading, color: theme.colors.text }}>Monitor {ticker} and alert me when the thesis changes.</Text><Text style={{ ...theme.type.body, color: theme.colors.textSecondary }}>Architecture placeholder only. No agent, notification, or background job is running.</Text><Button label="Create automation soon" disabled onPress={() => undefined} /></Card>{['Earnings summary', 'News monitoring', 'Price alert', 'Weekly comparison report'].map((item) => <Card key={item}><Text style={{ ...theme.type.heading, color: theme.colors.text }}>{item}</Text><Text style={{ ...theme.type.body, color: theme.colors.textSecondary }}>Ready for a future structured automation rule.</Text></Card>)}</View>;
+  return <View style={{ gap: theme.spacing.md }}><SectionHeader title="Automations" subtitle={`Future continuous monitoring for ${companyName}`} /><Card elevated><Tag label="AI monitoring placeholder" /><AppText variant="heading">Monitor {ticker} and alert me when the thesis changes.</AppText><AppText tone="secondary">Architecture placeholder only. No agent, notification, or background job is running.</AppText><Button label="Create automation soon" disabled /></Card>{['Earnings summary', 'News monitoring', 'Price alert', 'Weekly comparison report'].map((item) => <Card key={item}><AppText variant="heading">{item}</AppText><AppText tone="secondary">Ready for a future structured automation rule.</AppText></Card>)}</View>;
 }

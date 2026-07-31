@@ -1,7 +1,7 @@
-import { Card, EmptyState, Screen, StockRow, Tag, WidgetContainer } from '@/components';
+import { AppText, Card, Screen, StockRow, Tag, WidgetContainer } from '@/components';
 import { usePortfolio } from '@/hooks/useAppQueries';
 import { formatCurrency } from '@/utils/format';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { theme } from '@/theme';
 import { router } from 'expo-router';
 
@@ -12,9 +12,8 @@ export function PortfolioScreen() {
       {portfolio.data?.map((holding) => <Card key={holding.id}>
         <StockRow ticker={holding.company.ticker} name={holding.company.name} price={holding.company.price} change={holding.company.dailyChange} onPress={() => router.push(`/company/${holding.companyId}`)} />
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}><Tag label={`${holding.shares} shares`} /><Tag label={`Avg ${formatCurrency(holding.averageCost)}`} /></View>
-        <Text style={{ ...theme.type.body, color: theme.colors.textSecondary }}>{holding.notes}</Text>
+        <AppText tone="secondary">{holding.notes}</AppText>
       </Card>)}
-      {!portfolio.isLoading && !portfolio.data?.length && <EmptyState title="No holdings yet" description="Manual holdings will appear here." />}
     </WidgetContainer>
   </Screen>;
 }

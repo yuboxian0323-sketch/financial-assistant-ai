@@ -1,8 +1,6 @@
 export const formatCurrency = (value: number): string =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
-export const formatPercent = (value: number): string => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-
 export const initials = (name: string): string =>
   name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator, Modal as NativeModal, Pressable, ScrollView, StyleSheet, Text, TextInput,
-  type TextInputProps, type ViewStyle, View,
+  type TextInputProps, type TextProps, type ViewStyle, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -10,13 +10,19 @@ import type { PropsWithChildren, ReactNode } from 'react';
 import { theme } from '@/theme';
 import { initials } from '@/utils/format';
 
+type AppTextProps = TextProps & { variant?: keyof typeof theme.type; tone?: 'primary' | 'secondary' | 'muted' };
+export function AppText({ variant = 'body', tone = 'primary', style, ...props }: AppTextProps) {
+  const color = tone === 'primary' ? theme.colors.text : tone === 'secondary' ? theme.colors.textSecondary : theme.colors.textMuted;
+  return <Text {...props} style={[theme.type[variant], { color }, style]} />;
+}
+
 type CardProps = PropsWithChildren<{ onPress?: () => void; disabled?: boolean; elevated?: boolean; padding?: keyof typeof theme.spacing; loading?: boolean; style?: ViewStyle }>;
 export function Card({ children, onPress, disabled, elevated, padding = 'lg', loading, style }: CardProps) {
   const content = <View style={[styles.card, elevated && theme.elevation.card, { padding: theme.spacing[padding] }, style]}>{loading ? <LoadingSkeleton preset="card" /> : children}</View>;
   return onPress ? <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => ({ opacity: disabled ? theme.opacity.disabled : pressed ? theme.opacity.pressed : 1 })}>{content}</Pressable> : content;
 }
 
-type ButtonProps = { label: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'ghost'; size?: 'small' | 'medium'; loading?: boolean; disabled?: boolean; icon?: keyof typeof Ionicons.glyphMap };
+type ButtonProps = { label: string; onPress?: () => void; variant?: 'primary' | 'secondary' | 'ghost'; size?: 'small' | 'medium'; loading?: boolean; disabled?: boolean; icon?: keyof typeof Ionicons.glyphMap };
 export function Button({ label, onPress, variant = 'primary', size = 'medium', loading, disabled, icon }: ButtonProps) {
   const scale = useSharedValue(1);
   const reduceMotion = useReducedMotion();

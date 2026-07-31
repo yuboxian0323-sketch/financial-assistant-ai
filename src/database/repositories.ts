@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { Company, CompanyContent, DatabaseInfo, Holding, WatchlistEntry } from '@/types/domain';
+import type { Company, CompanyContent, DatabaseInfo, Holding } from '@/types/domain';
 
 type CompanyRow = Omit<Company, 'aiSummary' | 'bullThesis' | 'bearThesis' | 'dailyChange' | 'financials'> & {
   ai_summary: string; bull_thesis: string; bear_thesis: string; daily_change: number; financials_json: string;
@@ -32,13 +32,6 @@ export class InvestmentRepository {
     return rows.map((row) => ({ id: row.holding_id, companyId: row.company_id, shares: row.shares, averageCost: row.average_cost, notes: row.notes, company: mapCompany(row) }));
   }
 
-  async watchlist(): Promise<WatchlistEntry[]> {
-    const rows = await this.db.getAllAsync<{ watch_id: string; company_id: string } & CompanyRow>(
-      `SELECT w.id AS watch_id, w.company_id, c.* FROM watchlist w JOIN companies c ON c.id = w.company_id ORDER BY c.name`,
-    );
-    return rows.map((row) => ({ id: row.watch_id, companyId: row.company_id, company: mapCompany(row) }));
-  }
-
   async content(companyId?: string, kind?: CompanyContent['kind']): Promise<CompanyContent[]> {
     const result: CompanyContent[] = [];
     const tables = [
@@ -58,11 +51,6 @@ export class InvestmentRepository {
       result.push(...rows.map((row) => ({ id: row.id, companyId: row.company_id, kind: source.fixedKind ?? row.kind ?? 'research', title: row.title, body: row.body, occurredAt: row.occurred_at, importance: row.importance })));
     }
     return result.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  }
-
-  async setting(key: string): Promise<string | null> {
-    const row = await this.db.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key = ?', key);
-    return row?.value ?? null;
   }
 
   async info(): Promise<DatabaseInfo> {

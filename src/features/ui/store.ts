@@ -2,16 +2,13 @@ import { create } from 'zustand';
 
 interface UIState {
   researchSearch: string;
-  expandedCard: string | null;
-  modal: string | null;
+  companyHubPage: string | null;
   setResearchSearch(value: string): void;
-  setExpandedCard(value: string | null): void;
-  setModal(value: string | null): void;
+  setCompanyHubPage(value: string | null): void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  researchSearch: '', expandedCard: null, modal: null,
+  researchSearch: '', companyHubPage: null,
   setResearchSearch: (researchSearch) => set({ researchSearch }),
-  setExpandedCard: (expandedCard) => set({ expandedCard }),
-  setModal: (modal) => set({ modal }),
+  setCompanyHubPage: (companyHubPage) => set({ companyHubPage }),
 }));

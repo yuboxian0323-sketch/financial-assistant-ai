@@ -18,10 +18,6 @@ export function usePortfolio() {
   const { portfolio } = useServices();
   return useQuery({ queryKey: ['portfolio'], queryFn: portfolio.getHoldings });
 }
-export function useWatchlist() {
-  const { stock } = useServices();
-  return useQuery({ queryKey: ['watchlist'], queryFn: stock.getWatchlist });
-}
 export function useSessionBrief() {
   const { sessionBrief } = useServices();
   return useQuery({ queryKey: ['session-brief'], queryFn: sessionBrief.getBrief });

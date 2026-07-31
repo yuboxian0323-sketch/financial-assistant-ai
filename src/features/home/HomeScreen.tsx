@@ -1,7 +1,5 @@
-import { Card, EmptyState, NewsCard, ProgressIndicator, Screen, SummaryCard, WidgetContainer } from '@/components';
+import { AppText, Card, EmptyState, NewsCard, ProgressIndicator, Screen, SummaryCard, WidgetContainer } from '@/components';
 import { useSessionBrief } from '@/hooks/useAppQueries';
-import { Text } from 'react-native';
-import { theme } from '@/theme';
 import { router } from 'expo-router';
 
 export function HomeScreen() {
@@ -15,7 +13,7 @@ export function HomeScreen() {
       {data?.industryEvents.map((item) => <NewsCard key={item.id} headline={item.title} summary={item.body} timestamp={item.occurredAt} onPress={() => router.push(`/company/${item.companyId}`)} />)}
     </WidgetContainer>
     <WidgetContainer title="Needs Attention" loading={brief.isLoading}>
-      {data?.needsAttention.map((item, index) => <Card key={item}><Text style={{ ...theme.type.body, color: theme.colors.text }}>{item}</Text><ProgressIndicator value={(index + 1) / 3} label="Sample research priority" /></Card>)}
+      {data?.needsAttention.map((item, index) => <Card key={item}><AppText>{item}</AppText><ProgressIndicator value={(index + 1) / 3} label="Sample research priority" /></Card>)}
     </WidgetContainer>
     <WidgetContainer title="Upcoming Events" loading={brief.isLoading}>
       {data?.upcomingEvents.map((item) => <NewsCard key={item.id} headline={item.title} summary={item.body} timestamp={item.occurredAt} onPress={() => router.push(`/company/${item.companyId}`)} />)}
