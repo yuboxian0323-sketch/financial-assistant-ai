@@ -7,7 +7,6 @@ export default function TabLayout() {
     <Tabs.Screen name="portfolio" options={{ title: 'Portfolio' }} />
     <Tabs.Screen name="workspace" options={{ title: 'Workspace' }} />
     <Tabs.Screen name="research" options={{ title: 'Research' }} />
-    <Tabs.Screen name="automations" options={{ title: 'Automations' }} />
-    <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
+    <Tabs.Screen name="automations" options={{ title: 'Tasks' }} />
   </Tabs>;
 }

@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
-  ActivityIndicator, Modal as NativeModal, Pressable, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Modal as NativeModal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput,
   type TextInputProps, type TextProps, type ViewStyle, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { theme } from '@/theme';
 import { initials } from '@/utils/format';
+
+export { InteractivePriceChart, type PriceChartMode } from './InteractivePriceChart';
 
 type AppTextProps = TextProps & { variant?: keyof typeof theme.type; tone?: 'primary' | 'secondary' | 'muted' };
 export function AppText({ variant = 'body', tone = 'primary', style, ...props }: AppTextProps) {
@@ -43,16 +46,43 @@ export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
   return <View accessibilityLabel={`${name} avatar`} style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}><Text style={styles.avatarText}>{initials(name)}</Text></View>;
 }
 
-export function StockRow({ ticker, name, price, change, onPress, trailing }: { ticker: string; name: string; price?: number; change?: number; onPress?: () => void; trailing?: ReactNode }) {
-  return <Pressable accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={`${name}, ${ticker}`} onPress={onPress} style={({ pressed }) => [styles.stockRow, pressed && styles.pressed]}><Avatar name={name} /><View style={styles.flex}><Text style={styles.label}>{ticker}</Text><Text style={styles.caption}>{name}</Text></View>{trailing ?? <View style={styles.alignEnd}>{price !== undefined && <Text style={styles.label}>${price.toFixed(2)}</Text>}{change !== undefined && <Text style={[styles.caption, { color: change >= 0 ? theme.colors.positive : theme.colors.negative }]}>{change >= 0 ? '+' : ''}{change.toFixed(2)}%</Text>}</View>}</Pressable>;
+const companyLogoIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+  nvda: 'hardware-chip', msft: 'logo-microsoft', aapl: 'logo-apple', googl: 'logo-google',
+  meta: 'infinite', amd: 'hardware-chip-outline', tsm: 'hardware-chip',
+};
+
+export function CompanyLogo({ companyId, name, size = 44 }: { companyId: string; name: string; size?: number }) {
+  return <View accessibilityLabel={`${name} logo`} style={[styles.companyLogo, { width: size, height: size, borderRadius: size / 2 }]}><Ionicons name={companyLogoIcons[companyId] ?? 'business'} size={size * 0.5} color={theme.colors.accent} /></View>;
+}
+
+export function MiniSparkline({ points, width, height = 44, positive = true }: { points: number[]; width: number; height?: number; positive?: boolean }) {
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = Math.max(1, max - min);
+  const step = width / Math.max(1, points.length - 1);
+  const coordinates = points.map((point, index) => ({ x: index * step, y: height - ((point - min) / range) * (height - theme.spacing.sm) - theme.spacing.xs }));
+  return <View accessible={false} pointerEvents="none" style={{ position: 'relative', width, height }}>{coordinates.slice(0, -1).map((point, index) => {
+    const next = coordinates[index + 1];
+    if (!next) return null;
+    const lineWidth = Math.hypot(next.x - point.x, next.y - point.y);
+    const angle = Math.atan2(next.y - point.y, next.x - point.x) * (180 / Math.PI);
+    return <View key={`${point.x}-${point.y}`} style={[styles.sparklineSegment, { backgroundColor: positive ? theme.colors.positive : theme.colors.negative, width: lineWidth, left: (point.x + next.x) / 2 - lineWidth / 2, top: (point.y + next.y) / 2, transform: [{ rotate: `${angle}deg` }] }]} />;
+  })}</View>;
+}
+
+export function StockRow({ ticker, name, price, change, quoteSource, onPress, trailing }: { ticker: string; name: string; price?: number; change?: number; quoteSource?: 'live' | 'sample'; onPress?: () => void; trailing?: ReactNode }) {
+  const sourceLabel = quoteSource === 'live' ? 'Finnhub quote' : quoteSource === 'sample' ? 'Sample fallback' : undefined;
+  return <Pressable accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={`${name}, ${ticker}${sourceLabel ? `, ${sourceLabel}` : ''}`} onPress={onPress} style={({ pressed }) => [styles.stockRow, pressed && styles.pressed]}><Avatar name={name} /><View style={styles.flex}><Text style={styles.label}>{ticker}</Text><Text style={styles.caption}>{name}</Text></View>{trailing ?? <View style={styles.alignEnd}>{price !== undefined && <Text style={styles.label}>${price.toFixed(2)}</Text>}{change !== undefined && <Text style={[styles.caption, { color: change >= 0 ? theme.colors.positive : theme.colors.negative }]}>{change >= 0 ? '+' : ''}{change.toFixed(2)}%</Text>}{sourceLabel && <Text style={styles.quoteSource}>{sourceLabel}</Text>}</View>}</Pressable>;
 }
 
 export function WidgetContainer({ title, children, loading, empty, error, onRetry }: PropsWithChildren<{ title: string; loading?: boolean; empty?: boolean; error?: Error | null; onRetry?: () => void }>) {
   return <View style={styles.widget}><SectionHeader title={title} />{loading ? <LoadingSkeleton preset="card" /> : error ? <EmptyState title="Couldn’t load this section" description={error.message} actionLabel="Try again" onAction={onRetry} /> : empty ? <EmptyState title="Nothing here yet" description="This section is ready for your research." /> : children}</View>;
 }
 
-export function NewsCard({ headline, summary, timestamp, company, important, onPress }: { headline: string; summary: string; timestamp: string; company?: string; important?: boolean; onPress?: () => void }) {
-  return <Card onPress={onPress}><View style={styles.badges}>{company && <Tag label={company} />}{important && <Tag label="Important" tone="warning" />}</View><Text style={styles.label}>{headline}</Text><Text style={styles.body}>{summary}</Text><Text style={styles.caption}>{new Date(timestamp).toLocaleDateString()}</Text></Card>;
+export function NewsCard({ headline, summary, timestamp, company, source, important, onPress }: { headline: string; summary: string; timestamp: string; company?: string; source?: string; important?: boolean; onPress?: () => void }) {
+  const date = new Date(timestamp);
+  const dateLabel = Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleDateString();
+  return <Card onPress={onPress}><View style={styles.badges}>{company && <Tag label={company} />}{important && <Tag label="Important" tone="warning" />}</View><Text style={styles.label}>{headline}</Text>{summary ? <Text style={styles.body}>{summary}</Text> : null}<Text style={styles.caption}>{source ? `${source} · ` : ''}{dateLabel}{onPress ? ' · Open article' : ''}</Text></Card>;
 }
 
 export function SummaryCard({ title, summary, metric, emphasis }: { title: string; summary: string; metric?: string; emphasis?: boolean }) {
@@ -99,20 +129,26 @@ export function ProgressIndicator({ value, label }: { value?: number; label?: st
   return <View accessible accessibilityRole="progressbar" accessibilityValue={value === undefined ? undefined : { min: 0, max: 100, now: percentage }}><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${percentage}%` }]} /></View>{label && <Text style={styles.caption}>{label}</Text>}</View>;
 }
 
-export function Screen({ title, subtitle, children, scroll = true }: PropsWithChildren<{ title: string; subtitle?: string; scroll?: boolean }>) {
-  const content = <View style={styles.screenContent}><Text accessibilityRole="header" style={styles.hero}>{title}</Text>{subtitle && <Text style={styles.body}>{subtitle}</Text>}{children}</View>;
-  return scroll ? <ScrollView style={styles.screen} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled">{content}</ScrollView> : <View style={styles.screen}>{content}</View>;
+export function Screen({ title, subtitle, children, scroll = true, refreshing = false, onRefresh }: PropsWithChildren<{ title: string; subtitle?: string; scroll?: boolean; refreshing?: boolean; onRefresh?: () => void }>) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const content = <View style={styles.screenContent}><View style={styles.screenHeader}><Text accessibilityRole="header" style={[styles.hero, styles.screenTitle]}>{title}</Text>{pathname !== '/settings' && <Pressable accessibilityRole="button" accessibilityLabel="Open settings" hitSlop={8} onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}><Ionicons name="settings-outline" size={22} color={theme.colors.text} /></Pressable>}</View>{subtitle && <Text style={styles.body}>{subtitle}</Text>}{children}</View>;
+  return scroll ? <ScrollView style={styles.screen} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.accent} /> : undefined}>{content}</ScrollView> : <View style={styles.screen}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colors.background },
   screenContent: { padding: theme.spacing.xl, gap: theme.spacing.lg, paddingBottom: theme.spacing.hero },
   flex: { flex: 1 }, alignEnd: { alignItems: 'flex-end' }, center: { textAlign: 'center' },
-  hero: { ...theme.type.hero, color: theme.colors.text, marginTop: theme.spacing.md },
+  screenHeader: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginTop: theme.spacing.md },
+  screenTitle: { flex: 1 },
+  settingsButton: { width: 44, height: 44, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surfaceElevated, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
+  hero: { ...theme.type.hero, color: theme.colors.text },
   heading: { ...theme.type.heading, color: theme.colors.text },
   label: { ...theme.type.heading, color: theme.colors.text },
   body: { ...theme.type.body, color: theme.colors.textSecondary },
   caption: { ...theme.type.caption, color: theme.colors.textMuted },
+  quoteSource: { ...theme.type.caption, color: theme.colors.textMuted, fontSize: 10, lineHeight: 13 },
   metric: { fontSize: 28, lineHeight: 34, fontWeight: '700', color: theme.colors.text },
   card: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, gap: theme.spacing.sm },
   emphasis: { backgroundColor: theme.colors.accentSoft },
@@ -125,6 +161,8 @@ const styles = StyleSheet.create({
   search: { minHeight: 48, backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, flexDirection: 'row', alignItems: 'center', paddingHorizontal: theme.spacing.md, gap: theme.spacing.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
   searchInput: { flex: 1, ...theme.type.body, color: theme.colors.text, paddingVertical: theme.spacing.md },
   avatar: { backgroundColor: theme.colors.accentSoft, alignItems: 'center', justifyContent: 'center' }, avatarText: { ...theme.type.caption, color: theme.colors.accent },
+  companyLogo: { backgroundColor: theme.colors.accentSoft, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
+  sparklineSegment: { position: 'absolute', height: 2, borderRadius: theme.radius.pill },
   stockRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingVertical: theme.spacing.sm },
   widget: { gap: theme.spacing.md }, badges: { flexDirection: 'row', gap: theme.spacing.sm },
   empty: { alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, paddingVertical: theme.spacing.xl },
