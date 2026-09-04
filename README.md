@@ -260,25 +260,6 @@ The application also considers mobile accessibility and reduced-motion behavior 
 
 ---
 
-## Project Status
-
-FI AI is an **independent project under active development**.
-
-The current prototype establishes the mobile application foundation, company-based navigation, local persistence, state management, and investment research interface.
-
-Current development is focused on expanding:
-
-- Customizable research workspaces
-- Research task workflows
-- Financial and market-data integration
-- AI-assisted research functionality
-- Company research modules
-- Mobile UI/UX
-
-Some functionality described in this README represents the **product direction** and may still be under development rather than production-ready.
-
----
-
 ## Roadmap
 
 FI AI is evolving toward a more complete personalized investment research environment.
