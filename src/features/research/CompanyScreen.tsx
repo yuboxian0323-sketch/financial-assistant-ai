@@ -1,29 +1,17 @@
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, View } from 'react-native';
-import { AppText, Card, EmptyState, LoadingSkeleton, Pill, Screen, SectionHeader, SummaryCard, Tag } from '@/components';
+import { AppText, Card, EmptyState, LoadingSkeleton, Pill, Screen, SectionHeader, Tag } from '@/components';
 import { AddToPortfolioButton } from '@/features/research/AddToPortfolioButton';
+import { CompanyOverview } from '@/features/research/CompanyOverview';
 import { CompanyNewsFeed } from '@/features/research/CompanyNewsFeed';
 import { StockHistoryChart } from '@/features/research/StockHistoryChart';
 import { WorkspaceDashboard } from '@/features/workspace/WorkspaceDashboard';
 import { useCompany, useCompanyContent, useCompanyNews } from '@/hooks/useAppQueries';
 import { useUIStore } from '@/features/ui/store';
-import type { Company, CompanyHubPage } from '@/types/domain';
+import type { CompanyHubPage } from '@/types/domain';
 import { theme } from '@/theme';
 
 const pages: CompanyHubPage[] = ['Workspace', 'Overview', 'News', 'Automations'];
-const overviewGroups = [
-  { title: 'Company', body: 'Description, headquarters, leadership, employees, and founding history.' },
-  { title: 'Business', body: 'Business model, products, services, customers, and suppliers.' },
-  { title: 'Segments', body: 'Business segments, revenue mix, and geographic exposure.' },
-  { title: 'Valuation', body: 'P/E, forward P/E, EV/EBITDA, PEG, DCF, and historical context.' },
-  { title: 'Competitors', body: 'Direct, indirect, and emerging competitive threats.' },
-  { title: 'Supply Chain & Customers', body: 'Manufacturers, suppliers, partners, and major customer exposure.' },
-  { title: 'Risks & Opportunities', body: 'Business, macro, and regulatory risks alongside durable growth drivers.' },
-  { title: 'Timeline', body: 'Important company events arranged as a durable historical record.' },
-  { title: 'Documents', body: 'Annual reports, quarterly reports, presentations, and SEC filing placeholders.' },
-  { title: 'AI Analysis', body: 'Future long-form SWOT, moat, industry position, and outlook analysis.' },
-] as const;
-
 export function CompanyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const storedPage = useUIStore((state) => state.companyHubPage);
@@ -44,18 +32,6 @@ export function CompanyScreen() {
     {selected === 'News' && <CompanyNewsFeed symbol={data.ticker} companyId={data.id} articles={liveNews.data ?? []} loading={liveNews.isLoading} error={liveNews.error} retry={() => { void liveNews.refetch(); }} fallbackItems={news.data ?? []} />}
     {selected === 'Automations' && <CompanyAutomations companyName={data.name} ticker={data.ticker} />}
   </Screen>;
-}
-
-function CompanyOverview({ company }: { company: Company }) {
-  return <View style={{ gap: theme.spacing.md }}>
-    <SectionHeader title="Overview" subtitle="The complete, non-personalized company knowledge base" />
-    <SummaryCard title="Company description" summary={company.overview} />
-    <SectionHeader title="Financials" />
-    {company.financials.map((metric) => <SummaryCard key={metric.label} title={metric.label} metric={metric.value} summary="Representative placeholder metric." />)}
-    {overviewGroups.map((group) => <Card key={group.title}><AppText variant="heading">{group.title}</AppText><AppText tone="secondary">{group.body}</AppText></Card>)}
-    <Card><Tag label="Bull thesis" tone="positive" /><AppText>{company.bullThesis}</AppText></Card>
-    <Card><Tag label="Bear thesis" tone="warning" /><AppText>{company.bearThesis}</AppText></Card>
-  </View>;
 }
 
 function CompanyAutomations({ companyName, ticker }: { companyName: string; ticker: string }) {

@@ -57,6 +57,53 @@ export interface StockHistory {
   asOf: string;
 }
 
+export interface CompanyMarketProfile {
+  symbol: string;
+  name: string;
+  country?: string;
+  currency?: string;
+  exchange?: string;
+  industry?: string;
+  ipoDate?: string;
+  website?: string;
+  marketCapitalizationMillions?: number;
+  sharesOutstandingMillions?: number;
+}
+
+export interface CompanyMarketFundamentals {
+  peRatio?: number;
+  priceToBook?: number;
+  priceToSales?: number;
+  dividendYield?: number;
+  beta?: number;
+  eps?: number;
+  revenuePerShare?: number;
+  revenueGrowth?: number;
+  epsGrowth?: number;
+  grossMargin?: number;
+  operatingMargin?: number;
+  netMargin?: number;
+  returnOnEquity?: number;
+  returnOnAssets?: number;
+  currentRatio?: number;
+  quickRatio?: number;
+  debtToEquity?: number;
+  freeCashFlowPerShare?: number;
+  week52High?: number;
+  week52Low?: number;
+  week52Return?: number;
+  yearToDateReturn?: number;
+}
+
+/** Normalized live company facts returned by the protected market-data adapter. */
+export interface CompanyMarketOverview {
+  profile: CompanyMarketProfile;
+  fundamentals: CompanyMarketFundamentals;
+  peers: string[];
+  source: 'Finnhub';
+  asOf: string;
+}
+
 export interface NewsArticle {
   id: string;
   symbol: string;

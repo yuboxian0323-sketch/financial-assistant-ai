@@ -1,4 +1,4 @@
-import type { AddPortfolioHoldingInput, AIAnalysis, AIAnalysisRequest, Company, CompanyContent, DatabaseInfo, Holding, HomeBrief, NewsAISummary, NewsAISummaryRequest, NewsArticle, PortfolioOverview, QuoteBatch, ResearchTask, ResearchTaskDraft, ResearchTaskEvidence, ResearchTaskOutput, ResearchTaskOutputDraft, StockHistory, StockHistoryRange, StockSearchResult, WorkspaceLayout, WorkspaceWidgetSettings, WorkspaceWidgetSize, WorkspaceWidgetType } from '@/types/domain';
+import type { AddPortfolioHoldingInput, AIAnalysis, AIAnalysisRequest, Company, CompanyContent, CompanyMarketOverview, DatabaseInfo, Holding, HomeBrief, NewsAISummary, NewsAISummaryRequest, NewsArticle, PortfolioOverview, QuoteBatch, ResearchTask, ResearchTaskDraft, ResearchTaskEvidence, ResearchTaskOutput, ResearchTaskOutputDraft, StockHistory, StockHistoryRange, StockSearchResult, WorkspaceLayout, WorkspaceWidgetSettings, WorkspaceWidgetSize, WorkspaceWidgetType } from '@/types/domain';
 
 export interface AIService {
   analyzeCompany(request: AIAnalysisRequest): Promise<AIAnalysis>;
@@ -11,6 +11,7 @@ export interface MarketDataService {
   getQuotes(symbols: string[]): Promise<QuoteBatch>;
   searchStocks(query: string): Promise<StockSearchResult[]>;
   getHistory(symbol: string, range: StockHistoryRange): Promise<StockHistory>;
+  getCompanyOverview(symbol: string): Promise<CompanyMarketOverview>;
 }
 
 export interface NewsService {

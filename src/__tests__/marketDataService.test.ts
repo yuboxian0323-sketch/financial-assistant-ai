@@ -80,6 +80,39 @@ describe('live market data service', () => {
     expect(fetchImpl).toHaveBeenCalledWith('/api/market/history?symbol=AAPL&range=1M', expect.any(Object));
   });
 
+  it('loads and caches validated live company fundamentals', async () => {
+    const overview = {
+      profile: {
+        symbol: 'AAPL', name: 'Apple Inc', country: 'US', currency: 'USD',
+        exchange: 'NASDAQ NMS - GLOBAL MARKET', industry: 'Technology',
+        marketCapitalizationMillions: 3_000_000, sharesOutstandingMillions: 15_000,
+      },
+      fundamentals: { peRatio: 31.2, grossMargin: 46.2, week52High: 260.1 },
+      peers: ['MSFT', 'GOOGL'],
+      source: 'Finnhub' as const,
+      asOf: '2026-09-04T12:00:00.000Z',
+    };
+    const fetchImpl = jest.fn(async () => response({ overview })) as unknown as typeof fetch;
+    const service = createMarketDataService({ fetchImpl });
+
+    await expect(service.getCompanyOverview('aapl')).resolves.toEqual(overview);
+    await expect(service.getCompanyOverview('AAPL')).resolves.toEqual(overview);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledWith('/api/market/company?symbol=AAPL', expect.any(Object));
+  });
+
+  it('rejects malformed company fundamentals at the service boundary', async () => {
+    const fetchImpl = jest.fn(async () => response({ overview: { profile: {}, fundamentals: {}, peers: [] } })) as unknown as typeof fetch;
+    const service = createMarketDataService({ fetchImpl });
+
+    await expect(service.getCompanyOverview('AAPL')).rejects.toMatchObject({
+      code: 'SERVICE',
+      message: expect.stringContaining('invalid data'),
+      retryable: true,
+    });
+  });
+
   it('identifies a stale Expo server instead of treating HTML as chart data', async () => {
     const fetchImpl = jest.fn(async () => ({
       ok: false,

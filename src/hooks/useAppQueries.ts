@@ -99,6 +99,17 @@ export function useStockHistory(symbol: string, range: StockHistoryRange, enable
   });
 }
 
+export function useCompanyMarketOverview(symbol: string) {
+  const { marketData } = useServices();
+  const normalizedSymbol = normalizeStockSymbol(symbol);
+  return useQuery({
+    queryKey: ['company-market-overview', normalizedSymbol],
+    queryFn: () => marketData.getCompanyOverview(normalizedSymbol),
+    enabled: normalizedSymbol.length > 0,
+    staleTime: 60 * 60_000,
+  });
+}
+
 export function useCompanyNews(symbol: string) {
   const { news } = useServices();
   const normalizedSymbol = normalizeStockSymbol(symbol);

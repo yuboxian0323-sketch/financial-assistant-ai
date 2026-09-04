@@ -1,5 +1,5 @@
 import type { MarketDataService } from './contracts';
-import { AppError, type Company, type MarketIndex, type QuoteBatch, type StockHistory, type StockHistoryRange, type StockQuote, type StockSearchResult } from '@/types/domain';
+import { AppError, type Company, type CompanyMarketFundamentals, type CompanyMarketOverview, type MarketIndex, type QuoteBatch, type StockHistory, type StockHistoryRange, type StockQuote, type StockSearchResult } from '@/types/domain';
 import { normalizeStockSymbols } from '@/utils/stocks';
 
 interface MarketQuoteResponse {
@@ -22,6 +22,12 @@ interface MarketSearchResponse {
 
 interface MarketHistoryResponse {
   history?: unknown;
+  code?: unknown;
+  message?: unknown;
+}
+
+interface CompanyOverviewResponse {
+  overview?: unknown;
   code?: unknown;
   message?: unknown;
 }
@@ -69,6 +75,25 @@ function isStockHistory(value: unknown): value is StockHistory {
       && Number.isFinite((point as Record<string, unknown>).close));
 }
 
+function hasOnlyOptionalNumbers(value: unknown): value is CompanyMarketFundamentals {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value)
+    && Object.values(value).every((item) => item === undefined || (typeof item === 'number' && Number.isFinite(item))));
+}
+
+function isCompanyMarketOverview(value: unknown): value is CompanyMarketOverview {
+  if (!value || typeof value !== 'object') return false;
+  const overview = value as Record<string, unknown>;
+  if (!overview.profile || typeof overview.profile !== 'object' || Array.isArray(overview.profile)) return false;
+  const profile = overview.profile as Record<string, unknown>;
+  return typeof profile.symbol === 'string'
+    && typeof profile.name === 'string'
+    && hasOnlyOptionalNumbers(overview.fundamentals)
+    && Array.isArray(overview.peers)
+    && overview.peers.every((peer) => typeof peer === 'string')
+    && overview.source === 'Finnhub'
+    && typeof overview.asOf === 'string';
+}
+
 function errorFromResponse(status: number, body: MarketQuoteResponse, fallback: string): AppError {
   const message = typeof body.message === 'string' ? body.message : fallback;
   if (status === 503 && body.code === 'MARKET_API_NOT_CONFIGURED') {
@@ -106,6 +131,7 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
   const cache = new Map<string, { quote: StockQuote; expiresAt: number }>();
   const searchCache = new Map<string, { results: StockSearchResult[]; expiresAt: number }>();
   const historyCache = new Map<string, { history: StockHistory; expiresAt: number }>();
+  const overviewCache = new Map<string, { overview: CompanyMarketOverview; expiresAt: number }>();
 
   return {
     async getQuotes(inputSymbols: string[]): Promise<QuoteBatch> {
@@ -168,6 +194,24 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
       historyCache.set(cacheKey, { history: body.history, expiresAt: Date.now() + (range === '1H' || range === '1D' ? 60_000 : 5 * 60_000) });
       return body.history;
     },
+    async getCompanyOverview(inputSymbol: string): Promise<CompanyMarketOverview> {
+      const symbol = normalizeStockSymbols([inputSymbol])[0];
+      if (!symbol) throw new AppError('SERVICE', 'Choose a valid stock for the company overview.', false);
+      const cached = overviewCache.get(symbol);
+      if (cached && cached.expiresAt > Date.now()) return cached.overview;
+
+      const body = await getMarketJson<CompanyOverviewResponse>(fetchImpl, `/api/market/company?${new URLSearchParams({ symbol }).toString()}`, {
+        network: 'Could not reach the live company fundamentals service.',
+        unreadable: 'The live company fundamentals service returned an unreadable response.',
+        fallback: 'Live company fundamentals are temporarily unavailable.',
+        stale: 'The Expo server is stale. Restart Expo with --clear to load the company overview route.',
+      });
+      if (!isCompanyMarketOverview(body.overview)) {
+        throw new AppError('SERVICE', 'The company fundamentals service returned invalid data.', true);
+      }
+      overviewCache.set(symbol, { overview: body.overview, expiresAt: Date.now() + 60 * 60_000 });
+      return body.overview;
+    },
   };
 }
 
@@ -177,6 +221,7 @@ export function createOfflineMarketDataService(): MarketDataService {
     getQuotes: async (symbols) => ({ quotes: [], failedSymbols: normalizeStockSymbols(symbols) }),
     searchStocks: async () => [],
     getHistory: async () => { throw new AppError('CONFIGURATION', 'Historical prices are unavailable offline.', false); },
+    getCompanyOverview: async () => { throw new AppError('CONFIGURATION', 'Live company fundamentals are unavailable offline.', false); },
   };
 }
 

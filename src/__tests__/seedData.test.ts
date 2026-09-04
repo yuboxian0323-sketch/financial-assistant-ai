@@ -76,6 +76,7 @@ describe('live quote integration', () => {
         points: [{ timestamp: '2026-08-19T13:00:00.000Z', close: 205 }, { timestamp: '2026-08-19T14:00:00.000Z', close: 210 }],
         asOf: '2026-08-19T14:00:00.000Z',
       })),
+      getCompanyOverview: jest.fn(async () => { throw new Error('Not needed in this test.'); }),
       getQuotes: jest.fn(async () => ({
         quotes: [{
           symbol: 'NVDA', price: 210, change: 5, changePercent: 2.44,
