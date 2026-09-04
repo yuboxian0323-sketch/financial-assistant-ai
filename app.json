@@ -12,7 +12,8 @@
       "expo-router",
       "expo-sqlite",
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-notifications"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -35,7 +36,8 @@
       "typedRoutes": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "server"
     }
   }
 }
