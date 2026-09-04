@@ -12,7 +12,7 @@ Instead of separating company data, market news, research notes, AI tools, and t
 
 ## Demo
 
-[▶ Watch the FI AI Demo]([YOUR_VIDEO_LINK](https://drive.google.com/file/d/1t6pCjc9P64vpKWa7eiOWUKxk7XdUDoeK/view?usp=sharing))
+[▶ Watch the FI AI Demo](https://drive.google.com/file/d/1t6pCjc9P64vpKWa7eiOWUKxk7XdUDoeK/view?usp=sharing)
 
 ---
 
