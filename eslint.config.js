@@ -17,5 +17,10 @@ module.exports = defineConfig([
   {
     files: ['src/services/**/*.{ts,tsx}', 'src/database/**/*.{ts,tsx}', 'src/providers/**/*.{ts,tsx}', 'src/__tests__/**/*.{ts,tsx}'],
     rules: { 'no-restricted-imports': 'off' }
+  },
+  {
+    // Reanimated shared values are intentionally mutated inside UI-thread worklets.
+    files: ['src/components/index.tsx', 'src/features/workspace/WorkspaceDashboard.tsx'],
+    rules: { 'react-hooks/immutability': 'off' }
   }
 ]);

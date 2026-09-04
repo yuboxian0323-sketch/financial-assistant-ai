@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -41,8 +41,6 @@ export function InteractivePriceChart({
   const selectedPoint = points[selectedIndex] ?? points[points.length - 1];
   const selectedCoordinate = geometry.coordinates[selectedIndex] ?? geometry.coordinates[geometry.coordinates.length - 1];
   const color = positive ? theme.colors.positive : theme.colors.negative;
-
-  useEffect(() => setSelectedIndex(Math.max(0, points.length - 1)), [points]);
 
   const onLayout = (event: LayoutChangeEvent) => setWidth(Math.round(event.nativeEvent.layout.width));
   const selectAtLocation = (event: GestureResponderEvent) => {

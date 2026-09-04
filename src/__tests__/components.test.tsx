@@ -1,8 +1,7 @@
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { EmptyState, InteractivePriceChart, ProgressIndicator, Tag } from '@/components';
-import { InvestmentTabBar } from '@/components/navigation/InvestmentTabBar';
+import { InvestmentTabBar, type InvestmentTabBarProps } from '@/components/navigation/InvestmentTabBar';
 
 describe('shared components', () => {
   it('renders reusable empty and semantic badge states', () => {
@@ -38,7 +37,7 @@ describe('bottom navigation', () => {
     const routes = ['index', 'portfolio', 'workspace', 'research', 'automations'].map(
       (name) => ({ key: `${name}-key`, name, params: undefined }),
     );
-    const dispatch = jest.fn();
+    const navigate = jest.fn();
     const props = {
       state: { key: 'tabs-key', index: routes.length, routes },
       descriptors: Object.fromEntries(
@@ -46,9 +45,9 @@ describe('bottom navigation', () => {
       ),
       navigation: {
         emit: jest.fn(() => ({ defaultPrevented: false })),
-        dispatch,
+        navigate,
       },
-    } as unknown as BottomTabBarProps;
+    } as unknown as InvestmentTabBarProps;
 
     render(
       <SafeAreaProvider
@@ -60,11 +59,9 @@ describe('bottom navigation', () => {
 
     const visibleTabs = ['index', 'portfolio', 'workspace', 'research', 'automations'];
     visibleTabs.forEach((name) => fireEvent.press(screen.getByTestId(`tab-${name}`)));
-    expect(dispatch).toHaveBeenCalledTimes(visibleTabs.length);
+    expect(navigate).toHaveBeenCalledTimes(visibleTabs.length);
     visibleTabs.forEach((name) => {
-      expect(dispatch).toHaveBeenCalledWith(
-        expect.objectContaining({ payload: { name, params: undefined }, target: 'tabs-key' }),
-      );
+      expect(navigate).toHaveBeenCalledWith(name, undefined);
     });
     expect(screen.queryByTestId('tab-settings')).toBeNull();
   });

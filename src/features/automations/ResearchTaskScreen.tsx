@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppText, BulletList, Button, Card, ConfirmModal, Divider, EmptyState, LoadingSkeleton, MetadataRow, Screen, SectionHeader, Tag } from '@/components';
 import { TaskConfigurationEditor } from './TaskConfigurationEditor';
@@ -33,14 +33,21 @@ export function ResearchTaskScreen() {
   const task = taskQuery.data;
   const output = outputsQuery.data?.find((item) => item.taskId === id);
 
-  useEffect(() => { if (task) setDraft(task); }, [task]);
-
   if (taskQuery.isLoading) return <Screen title="Research Task"><LoadingSkeleton preset="card" /><LoadingSkeleton preset="card" /></Screen>;
   if (taskQuery.error || !task) return <Screen title="Research Task"><EmptyState title="Task unavailable" description={taskQuery.error?.message ?? 'This research task no longer exists.'} actionLabel="Back to Research Tasks" onAction={() => router.replace('/automations')} /></Screen>;
 
   const saveEdits = () => {
-    if (!draft) return;
-    update.mutate({ ...task, ...draft }, { onSuccess: () => setEditing(false) });
+    update.mutate({ ...task, ...(draft ?? task) }, { onSuccess: () => setEditing(false) });
+  };
+
+  const toggleEditing = () => {
+    if (editing) {
+      setEditing(false);
+      setDraft(null);
+    } else {
+      setDraft(task);
+      setEditing(true);
+    }
   };
 
   return <Screen title={task.name} subtitle="A persistent research workflow with one current output.">
@@ -66,13 +73,13 @@ export function ResearchTaskScreen() {
     <View style={styles.actions}>
       <Button label={run.isPending ? 'Running research…' : 'Run now'} icon="sparkles" onPress={() => run.mutate(task.id)} loading={run.isPending} />
       <Button label={task.status === 'running' ? 'Pause task' : 'Resume task'} variant="secondary" icon={task.status === 'running' ? 'pause' : 'play'} onPress={() => toggle.mutate(task.id)} loading={toggle.isPending} />
-      <Button label={editing ? 'Cancel editing' : 'Edit configuration'} variant="secondary" icon="create-outline" onPress={() => setEditing((value) => !value)} />
+      <Button label={editing ? 'Cancel editing' : 'Edit configuration'} variant="secondary" icon="create-outline" onPress={toggleEditing} />
     </View>
 
     {run.error ? <EmptyState title="This run didn’t finish" description={run.error.message} actionLabel="Try again" onAction={() => run.mutate(task.id)} /> : null}
 
-    {editing && draft ? <Card>
-      <TaskConfigurationEditor draft={draft} onChange={setDraft} />
+    {editing ? <Card>
+      <TaskConfigurationEditor draft={draft ?? task} onChange={setDraft} />
       {update.error ? <AppText style={styles.error}>{update.error.message}</AppText> : null}
       <Button label="Save changes" onPress={saveEdits} loading={update.isPending} />
     </Card> : null}

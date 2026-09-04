@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { TabActions } from '@react-navigation/native';
+import { Tabs } from 'expo-router';
+import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/theme';
@@ -21,7 +21,9 @@ const tabPositions: Record<string, `${number}%`> = {
   automations: '88%',
 };
 
-export function InvestmentTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export type InvestmentTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
+
+export function InvestmentTabBar({ state, descriptors, navigation }: InvestmentTabBarProps) {
   const insets = useSafeAreaInsets();
   const visibleRoutes = state.routes;
 
@@ -46,10 +48,7 @@ export function InvestmentTabBar({ state, descriptors, navigation }: BottomTabBa
             canPreventDefault: true,
           });
           if (!focused && !event.defaultPrevented) {
-            navigation.dispatch({
-              ...TabActions.jumpTo(route.name, route.params),
-              target: state.key,
-            });
+            navigation.navigate(route.name, route.params);
           }
         };
 

@@ -20,6 +20,7 @@ interface CompanyNewsFeedProps {
 /** Shows live provider articles, with a clearly identified local fallback when necessary. */
 export function CompanyNewsFeed({ symbol, articles, loading, error, retry, fallbackItems = [], companyId = '' }: CompanyNewsFeedProps) {
   const [filter, setFilter] = useState<(typeof filters)[number]>('Latest');
+  const [openedAt] = useState(Date.now);
   if (loading && !fallbackItems.length) return <LoadingSkeleton preset="card" />;
 
   const useLive = articles.length > 0;
@@ -42,8 +43,7 @@ export function CompanyNewsFeed({ symbol, articles, loading, error, retry, fallb
       url: undefined,
       important: item.importance >= 3,
     }));
-  const now = Date.now();
-  const cutoff = filter === '7 Days' ? now - 7 * 24 * 60 * 60_000 : filter === '30 Days' ? now - 30 * 24 * 60 * 60_000 : 0;
+  const cutoff = filter === '7 Days' ? openedAt - 7 * 24 * 60 * 60_000 : filter === '30 Days' ? openedAt - 30 * 24 * 60 * 60_000 : 0;
   const filtered = normalized.filter((item) => !cutoff || new Date(item.timestamp).getTime() >= cutoff).slice(0, 12);
 
   if (!normalized.length) {

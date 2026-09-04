@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { AppText, BulletList, Button, Card, EmptyState, LoadingSkeleton, Pill, Screen, SectionHeader, Tag } from '@/components';
 import { useAIAnalysis, useCompanies } from '@/hooks/useAppQueries';
@@ -17,16 +17,12 @@ export function AISupportScreen() {
   const { companyId } = useLocalSearchParams<{ companyId?: string }>();
   const companies = useCompanies();
   const analysis = useAIAnalysis();
-  const [selectedCompanyId, setSelectedCompanyId] = useState(companyId ?? '');
+  const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [question, setQuestion] = useState<string>(questionPresets[0]);
 
-  useEffect(() => {
-    if (companyId) setSelectedCompanyId(companyId);
-  }, [companyId]);
-
   const selectedCompany = useMemo(
-    () => companies.data?.find((company) => company.id === selectedCompanyId) ?? companies.data?.[0],
-    [companies.data, selectedCompanyId],
+    () => companies.data?.find((company) => company.id === (selectedCompanyId || companyId)) ?? companies.data?.[0],
+    [companies.data, companyId, selectedCompanyId],
   );
   const trimmedQuestion = question.trim();
   const canSubmit = Boolean(selectedCompany && trimmedQuestion.length >= 3 && trimmedQuestion.length <= 600);
