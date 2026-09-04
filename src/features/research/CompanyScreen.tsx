@@ -1,13 +1,16 @@
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, View } from 'react-native';
-import { AppText, Button, Card, EmptyState, LoadingSkeleton, NewsCard, Pill, Screen, SectionHeader, SummaryCard, Tag } from '@/components';
-import { useCompany, useCompanyContent } from '@/hooks/useAppQueries';
+import { AppText, Card, EmptyState, LoadingSkeleton, Pill, Screen, SectionHeader, SummaryCard, Tag } from '@/components';
+import { AddToPortfolioButton } from '@/features/research/AddToPortfolioButton';
+import { CompanyNewsFeed } from '@/features/research/CompanyNewsFeed';
+import { StockHistoryChart } from '@/features/research/StockHistoryChart';
+import { WorkspaceDashboard } from '@/features/workspace/WorkspaceDashboard';
+import { useCompany, useCompanyContent, useCompanyNews } from '@/hooks/useAppQueries';
 import { useUIStore } from '@/features/ui/store';
-import type { Company, CompanyContent, CompanyHubPage } from '@/types/domain';
+import type { Company, CompanyHubPage } from '@/types/domain';
 import { theme } from '@/theme';
 
 const pages: CompanyHubPage[] = ['Workspace', 'Overview', 'News', 'Automations'];
-const newsFilters = ['All', 'Company', 'Industry', 'Financial', 'Products', 'Management', 'Macro', 'AI Summary'];
 const overviewGroups = [
   { title: 'Company', body: 'Description, headquarters, leadership, employees, and founding history.' },
   { title: 'Business', body: 'Business model, products, services, customers, and suppliers.' },
@@ -28,29 +31,19 @@ export function CompanyScreen() {
   const select = useUIStore((state) => state.setCompanyHubPage);
   const company = useCompany(id);
   const news = useCompanyContent(id, 'news');
+  const liveNews = useCompanyNews(company.data?.ticker ?? '');
   if (company.isLoading) return <Screen title="Company Hub"><LoadingSkeleton preset="card" /><LoadingSkeleton preset="card" /></Screen>;
   if (company.error || !company.data) return <Screen title="Company Hub"><EmptyState title="Company unavailable" description={company.error?.message ?? 'This company could not be found.'} actionLabel="Try again" onAction={() => company.refetch()} /></Screen>;
   const data = company.data;
   return <Screen title={data.name} subtitle={`${data.ticker} · ${data.industry} · One shared company hub`}>
+    <StockHistoryChart symbol={data.ticker} currentPrice={data.price} dailyChange={data.dailyChange} />
+    <AddToPortfolioButton stock={{ symbol: data.ticker, name: data.name, type: data.industry, price: data.price }} />
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.sm }}>{pages.map((page) => <Pill key={page} label={page} selected={selected === page} onPress={() => select(page)} />)}</ScrollView>
-    {selected === 'Workspace' && <CompanyWorkspace company={data} newsCount={news.data?.length ?? 0} />}
+    {selected === 'Workspace' && <WorkspaceDashboard company={data} />}
     {selected === 'Overview' && <CompanyOverview company={data} />}
-    {selected === 'News' && <CompanyNews ticker={data.ticker} loading={news.isLoading} error={news.error} items={news.data ?? []} retry={() => news.refetch()} />}
+    {selected === 'News' && <CompanyNewsFeed symbol={data.ticker} companyId={data.id} articles={liveNews.data ?? []} loading={liveNews.isLoading} error={liveNews.error} retry={() => { void liveNews.refetch(); }} fallbackItems={news.data ?? []} />}
     {selected === 'Automations' && <CompanyAutomations companyName={data.name} ticker={data.ticker} />}
   </Screen>;
-}
-
-function CompanyWorkspace({ company, newsCount }: { company: Company; newsCount: number }) {
-  return <View style={{ gap: theme.spacing.md }}>
-    <SectionHeader title="Workspace" subtitle="Personal widgets referencing Overview data" />
-    <SummaryCard title="AI Summary · Placeholder" summary={company.aiSummary} emphasis />
-    <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-      <View style={{ flex: 1 }}><SummaryCard title="Sample price" metric={`$${company.price.toFixed(2)}`} summary={`${company.dailyChange >= 0 ? '+' : ''}${company.dailyChange.toFixed(2)}% today`} /></View>
-      <View style={{ flex: 1 }}><SummaryCard title="News" metric={String(newsCount)} summary="Sample tracked stories" /></View>
-    </View>
-    {company.financials.slice(0, 2).map((metric) => <SummaryCard key={metric.label} title={metric.label} metric={metric.value} summary="Referenced from the canonical Overview." />)}
-    <Card><Tag label="Customizable layout" /><AppText tone="secondary">Drag, resize, pin, and hide controls are intentionally reserved for a future milestone.</AppText></Card>
-  </View>;
 }
 
 function CompanyOverview({ company }: { company: Company }) {
@@ -65,12 +58,6 @@ function CompanyOverview({ company }: { company: Company }) {
   </View>;
 }
 
-function CompanyNews({ ticker, loading, error, items, retry }: { ticker: string; loading: boolean; error: Error | null; items: CompanyContent[]; retry: () => void }) {
-  if (loading) return <LoadingSkeleton preset="card" />;
-  if (error) return <EmptyState title="News unavailable" description={error.message} actionLabel="Try again" onAction={retry} />;
-  return <View style={{ gap: theme.spacing.md }}><SectionHeader title="News" subtitle="Everything that changes over time" /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.sm }}>{newsFilters.map((filter, index) => <Pill key={filter} label={filter} selected={index === 0} />)}</ScrollView>{items.length ? items.map((item) => <NewsCard key={item.id} headline={item.title} summary={item.body} timestamp={item.occurredAt} company={ticker} important={item.importance >= 3} />) : <EmptyState title="No news yet" description="Changing company information will appear here." />}</View>;
-}
-
 function CompanyAutomations({ companyName, ticker }: { companyName: string; ticker: string }) {
-  return <View style={{ gap: theme.spacing.md }}><SectionHeader title="Automations" subtitle={`Future continuous monitoring for ${companyName}`} /><Card elevated><Tag label="AI monitoring placeholder" /><AppText variant="heading">Monitor {ticker} and alert me when the thesis changes.</AppText><AppText tone="secondary">Architecture placeholder only. No agent, notification, or background job is running.</AppText><Button label="Create automation soon" disabled /></Card>{['Earnings summary', 'News monitoring', 'Price alert', 'Weekly comparison report'].map((item) => <Card key={item}><AppText variant="heading">{item}</AppText><AppText tone="secondary">Ready for a future structured automation rule.</AppText></Card>)}</View>;
+  return <View style={{ gap: theme.spacing.md }}><SectionHeader title="Automations" subtitle={`Future continuous monitoring for ${companyName}`} /><Card elevated><Tag label="Future AI monitoring" /><AppText variant="heading">Monitor {ticker} and alert me when the thesis changes.</AppText><AppText tone="secondary">Architecture placeholder only. No agent, notification, or background job is running.</AppText></Card>{['Earnings summary', 'News monitoring', 'Price alert', 'Weekly comparison report'].map((item) => <Card key={item}><AppText variant="heading">{item}</AppText><AppText tone="secondary">Ready for a future structured automation rule.</AppText></Card>)}</View>;
 }
