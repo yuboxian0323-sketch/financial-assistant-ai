@@ -149,6 +149,120 @@ This separation prevents a single state-management system from becoming responsi
 
 ---
 
+## Architecture
+
+FI AI is built as a **local-first, modular mobile application**. The system separates the investment research experience from data and state management, allowing features such as company research, customizable workspaces, and tasks to share infrastructure without being tightly coupled.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                         FI AI                               │
+│               React Native · TypeScript                    │
+│                                                             │
+│   ┌──────────────┐   ┌────────────────┐   ┌──────────────┐ │
+│   │   Company    │   │   Workspace    │   │    Tasks     │ │
+│   │   Research   │   │                │   │              │ │
+│   │              │   │ Modular        │   │ Research     │ │
+│   │ Overview     │   │ research       │   │ workflows    │ │
+│   │ News         │   │ widgets        │   │              │ │
+│   │ Financials   │   │                │   │              │ │
+│   └──────┬───────┘   └───────┬────────┘   └──────┬───────┘ │
+│          │                   │                    │         │
+│          └───────────────────┼────────────────────┘         │
+│                              │                              │
+│                    Expo Router / UI                         │
+├──────────────────────────────┼──────────────────────────────┤
+│                       DATA & STATE                          │
+│                                                             │
+│         ┌────────────────────┴───────────────────┐         │
+│         │                                        │         │
+│  ┌──────▼──────────┐                     ┌───────▼───────┐ │
+│  │ TanStack Query  │                     │    Zustand    │ │
+│  │                 │                     │               │ │
+│  │ Data lifecycle  │                     │ UI / client   │ │
+│  │ & caching       │                     │ state         │ │
+│  └──────┬──────────┘                     └───────────────┘ │
+│         │                                                   │
+├─────────┼───────────────────────────────────────────────────┤
+│                    LOCAL DATA LAYER                         │
+│         │                                                   │
+│  ┌──────▼───────────────────────────────────────────────┐  │
+│  │                       SQLite                         │  │
+│  │                                                     │  │
+│  │   Company Data · Research Data · User Configuration │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+
+                              │
+                              │  External integrations
+                              ▼
+
+              ┌────────────────────────────────┐
+              │ Financial / News / AI Services │
+              │        (as integrated)         │
+              └────────────────────────────────┘
+```
+
+### Core Design
+
+FI AI is organized around three product systems:
+
+**Company Research** provides stock-specific information and research views, including company information, news, financial data, and analysis.
+
+**Workspace** provides a modular research environment. The workspace structure is independent from the company being viewed, allowing a user's preferred research layout to be reused while the underlying content changes between stocks.
+
+**Tasks** extends research beyond passive information consumption by allowing investment research to be organized into trackable workflows.
+
+These systems share the same application infrastructure rather than operating as independent features.
+
+### State & Data Management
+
+FI AI separates different types of application state based on their responsibilities:
+
+- **TanStack Query** handles asynchronous data lifecycle and caching.
+- **Zustand** manages lightweight client and interface state.
+- **SQLite** provides persistent on-device storage.
+
+This prevents temporary UI state, asynchronously loaded information, and persistent user data from being managed as a single global state.
+
+### Local-First Design
+
+FI AI uses **SQLite for local persistence**, allowing user-specific research data and configuration to survive across application sessions.
+
+The local-first design also keeps persistent user state independent from external financial-data and AI providers.
+
+### Workspace Model
+
+A key architectural concept is separating **workspace configuration** from **company-specific content**.
+
+```text
+             User Workspace Configuration
+                         │
+            ┌────────────┼────────────┐
+            ▼            ▼            ▼
+        Overview       News       Research
+         Widget        Widget       Widget
+            │            │            │
+            └────────────┼────────────┘
+                         │
+                  Selected Company
+                         │
+              ┌──────────┼──────────┐
+              ▼          ▼          ▼
+            NVDA        AAPL       MSFT
+```
+
+The user defines **how they want to research** independently of **what company they are researching**.
+
+This allows FI AI to preserve a consistent research workflow while dynamically changing the information presented for each stock.
+
+### Extensibility
+
+The application is designed so additional research modules, financial-data sources, news providers, and AI capabilities can be integrated without redesigning the entire research interface.
+
+This modularity is important to FI AI's long-term goal of becoming a **personalized investment research environment rather than a fixed financial dashboard**.
+
+---
+
 ## AI-Assisted Development
 
 FI AI is also an experiment in **AI-assisted software engineering**.
