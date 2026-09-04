@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { AppText, Button, Card, EmptyState, LoadingSkeleton, Pill, Screen, SectionHeader, Tag } from '@/components';
+import { AppText, BulletList, Button, Card, EmptyState, LoadingSkeleton, Pill, Screen, SectionHeader, Tag } from '@/components';
 import { useAIAnalysis, useCompanies } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
 import { AppError, type AIAnalysis, type AICompanyContext, type Company } from '@/types/domain';
@@ -135,7 +135,7 @@ function AnalysisResult({ analysis, onFollowUp }: { analysis: AIAnalysis; onFoll
 function AnalysisList({ title, icon, items }: { title: string; icon: keyof typeof Ionicons.glyphMap; items: string[] }) {
   return <Card>
     <View style={styles.disclosureTitle}><Ionicons name={icon} size={20} color={theme.colors.accent} /><AppText variant="heading">{title}</AppText></View>
-    {items.length > 0 ? items.map((item) => <View key={item} style={styles.listItem}><View style={styles.bullet} /><AppText tone="secondary" style={styles.flex}>{item}</AppText></View>) : <AppText tone="muted">No items returned.</AppText>}
+    {items.length > 0 ? <BulletList items={items} /> : <AppText tone="muted">No items returned.</AppText>}
   </Card>;
 }
 
@@ -150,8 +150,6 @@ const styles = StyleSheet.create({
   count: { alignSelf: 'flex-end' },
   center: { textAlign: 'center' },
   results: { gap: theme.spacing.lg },
-  listItem: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm },
-  bullet: { width: 6, height: 6, borderRadius: theme.radius.pill, backgroundColor: theme.colors.accent, marginTop: theme.spacing.sm },
   followUp: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, paddingVertical: theme.spacing.sm },
   pressed: { opacity: theme.opacity.pressed },
 });

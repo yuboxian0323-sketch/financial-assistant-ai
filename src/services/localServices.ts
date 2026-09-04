@@ -22,6 +22,7 @@ import { applyLiveMarketQuotes, applyLiveQuotes, createOfflineMarketDataService 
 import { createUnavailableNewsService } from './newsService';
 import { delay } from '@/utils/format';
 import { calculateNextResearchRun } from '@/utils/researchSchedule';
+import { normalizeStockSymbol } from '@/utils/stocks';
 import { createWorkspaceService } from './workspaceService';
 
 export interface MockBehavior { delayMs?: number; failWith?: AppError }
@@ -144,7 +145,7 @@ function externalCompanyId(symbol: string): string {
 }
 
 function createResearchCompany(input: AddPortfolioHoldingInput): Company {
-  const symbol = input.symbol.trim().toUpperCase();
+  const symbol = normalizeStockSymbol(input.symbol);
   return {
     id: externalCompanyId(symbol),
     ticker: symbol,
@@ -200,6 +201,12 @@ export function createLocalServices(
   news: NewsService = createUnavailableNewsService(),
   notifications: NotificationService = unavailableNotifications,
 ): Services {
+  const taskOrThrow = async (id: string): Promise<ResearchTask> => {
+    const task = await repository.researchTask(id);
+    if (!task) throw new AppError('NOT_FOUND', 'Research task not found.', false);
+    return task;
+  };
+  const syncReminder = (task: ResearchTask) => notifications.syncTaskReminder(task).catch(() => undefined);
   const companyService = {
     search: (query = '') => simulate(async () => {
       const companies = await repository.companies(query.trim());
@@ -276,7 +283,7 @@ export function createLocalServices(
       };
     }, behavior),
     addHolding: (input: AddPortfolioHoldingInput) => simulate(async () => {
-      const symbol = input.symbol.trim().toUpperCase();
+      const symbol = normalizeStockSymbol(input.symbol);
       if (!symbol || !Number.isFinite(input.shares) || input.shares <= 0 || !Number.isFinite(input.averageCost) || input.averageCost <= 0) {
         throw new AppError('SERVICE', 'Enter a valid share amount and average cost.', false);
       }
@@ -375,12 +382,11 @@ export function createLocalServices(
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
       });
-      await notifications.syncTaskReminder(created).catch(() => undefined);
+      await syncReminder(created);
       return created;
     }, behavior),
     updateTask: (input: ResearchTask) => simulate(async (): Promise<ResearchTask> => {
-      const existing = await repository.researchTask(input.id);
-      if (!existing) throw new AppError('NOT_FOUND', 'Research task not found.', false);
+      const existing = await taskOrThrow(input.id);
       const draft = normalizeTaskDraft(input);
       const updatedAt = new Date().toISOString();
       const updated = await repository.updateResearchTask({
@@ -391,12 +397,11 @@ export function createLocalServices(
         nextRunAt: input.status === 'running' ? calculateNextResearchRun(draft.scheduleType, draft.scheduleLabel) : undefined,
         updatedAt,
       });
-      await notifications.syncTaskReminder(updated).catch(() => undefined);
+      await syncReminder(updated);
       return updated;
     }, behavior),
     toggleTask: (id: string) => simulate(async (): Promise<ResearchTask> => {
-      const task = await repository.researchTask(id);
-      if (!task) throw new AppError('NOT_FOUND', 'Research task not found.', false);
+      const task = await taskOrThrow(id);
       const status = task.status === 'running' ? 'paused' : 'running';
       const updated = await repository.updateResearchTask({
         ...task,
@@ -404,12 +409,11 @@ export function createLocalServices(
         nextRunAt: status === 'running' ? calculateNextResearchRun(task.scheduleType, task.scheduleLabel) : undefined,
         updatedAt: new Date().toISOString(),
       });
-      await notifications.syncTaskReminder(updated).catch(() => undefined);
+      await syncReminder(updated);
       return updated;
     }, behavior),
     duplicateTask: (id: string) => simulate(async (): Promise<ResearchTask> => {
-      const task = await repository.researchTask(id);
-      if (!task) throw new AppError('NOT_FOUND', 'Research task not found.', false);
+      const task = await taskOrThrow(id);
       const now = new Date();
       return repository.insertResearchTask({
         ...task,
@@ -423,14 +427,12 @@ export function createLocalServices(
       });
     }, behavior),
     deleteTask: (id: string) => simulate(async () => {
-      const task = await repository.researchTask(id);
-      if (!task) throw new AppError('NOT_FOUND', 'Research task not found.', false);
+      await taskOrThrow(id);
       await notifications.cancelTaskReminder(id).catch(() => undefined);
       await repository.deleteResearchTask(id);
     }, behavior),
     runTask: (id: string) => simulate(async (): Promise<ResearchTaskOutput> => {
-      const task = await repository.researchTask(id);
-      if (!task) throw new AppError('NOT_FOUND', 'Research task not found.', false);
+      const task = await taskOrThrow(id);
       const [savedCompanies, holdings, markets] = await Promise.all([
         repository.companies(), repository.portfolio(), withLiveMarkets(marketData),
       ]);
@@ -493,7 +495,7 @@ export function createLocalServices(
         nextRunAt: task.status === 'running' ? calculateNextResearchRun(task.scheduleType, task.scheduleLabel, completedAt) : undefined,
         updatedAt: output.generatedAt,
       });
-      await notifications.syncTaskReminder(updatedTask).catch(() => undefined);
+      await syncReminder(updatedTask);
       await notifications.notifyTaskCompleted(updatedTask, output).catch(() => undefined);
       return output;
     }, behavior),

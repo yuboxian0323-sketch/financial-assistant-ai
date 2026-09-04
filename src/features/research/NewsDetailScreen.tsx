@@ -1,15 +1,11 @@
 import { Linking, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { AppText, Button, Card, EmptyState, LoadingSkeleton, Screen, SectionHeader, Tag } from '@/components';
+import { AppText, BulletList, Button, Card, EmptyState, LoadingSkeleton, Screen, SectionHeader, Tag } from '@/components';
 import { useCompany, useCompanyContent, useCompanyNews, useNewsAISummary } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
 import type { NewsAISummaryRequest } from '@/types/domain';
-
-function readableDate(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Publication time unavailable' : date.toLocaleString();
-}
+import { formatDateTime } from '@/utils/format';
 
 /** Shows the complete available synopsis before the user decides whether to leave the app. */
 export function NewsDetailScreen() {
@@ -72,7 +68,7 @@ export function NewsDetailScreen() {
     <Card elevated>
       <View style={styles.tags}><Tag label={liveArticle ? 'Preferred publisher' : 'Saved sample'} tone={liveArticle ? 'positive' : 'default'} /><Tag label={source} /></View>
       <AppText variant="title">{headline}</AppText>
-      <AppText variant="caption" tone="muted">{readableDate(publishedAt)}</AppText>
+      <AppText variant="caption" tone="muted">{formatDateTime(publishedAt, 'Publication time unavailable')}</AppText>
     </Card>
     <Card>
       <SectionHeader title="Complete available summary" subtitle={liveArticle ? 'Full synopsis supplied by the news provider' : 'Locally saved sample research'} />
@@ -102,7 +98,7 @@ export function NewsDetailScreen() {
         <SummaryList title="Why it may matter" items={aiSummary.data.whyItMatters} />
         <SummaryList title="Risks and unknowns" items={aiSummary.data.risksAndUnknowns} />
         <SummaryList title="Questions to research next" items={aiSummary.data.questionsToResearch} />
-        <AppText variant="caption" tone="muted">Generated {readableDate(aiSummary.data.generatedAt)} · AI interpretation can be wrong. Verify important details with the publisher and primary sources.</AppText>
+        <AppText variant="caption" tone="muted">Generated {formatDateTime(aiSummary.data.generatedAt)} · AI interpretation can be wrong. Verify important details with the publisher and primary sources.</AppText>
         <Button label="Regenerate Analysis" variant="secondary" icon="refresh-outline" onPress={generateSummary} />
       </>}
     </Card>
@@ -126,9 +122,7 @@ function SummaryList({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return <View style={styles.summarySection}>
     <AppText variant="heading">{title}</AppText>
-    {items.map((item, index) => <View key={`${title}-${index}`} style={styles.bulletRow}>
-      <AppText tone="secondary">•</AppText><AppText tone="secondary" style={styles.bulletText}>{item}</AppText>
-    </View>)}
+    <BulletList items={items} />
   </View>;
 }
 
@@ -139,6 +133,4 @@ const styles = {
   aiCard: { gap: theme.spacing.md } as const,
   loadingGroup: { gap: theme.spacing.sm } as const,
   summarySection: { gap: theme.spacing.sm } as const,
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm } as const,
-  bulletText: { flex: 1 } as const,
 };

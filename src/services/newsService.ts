@@ -1,5 +1,7 @@
 import type { NewsService } from './contracts';
 import { AppError, type NewsArticle } from '@/types/domain';
+import { isWebUrl } from '@/utils/news';
+import { normalizeStockSymbol } from '@/utils/stocks';
 
 interface NewsResponseBody {
   articles?: unknown;
@@ -9,16 +11,6 @@ interface NewsResponseBody {
 }
 
 const cacheDurationMs = 5 * 60_000;
-
-function isWebUrl(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  try {
-    const protocol = new URL(value).protocol;
-    return protocol === 'https:' || protocol === 'http:';
-  } catch {
-    return false;
-  }
-}
 
 function isNewsArticle(value: unknown): value is NewsArticle {
   if (!value || typeof value !== 'object') return false;
@@ -42,7 +34,7 @@ export function createNewsService(fetchImpl: typeof fetch = fetch): NewsService 
   const cache = new Map<string, { articles: NewsArticle[]; expiresAt: number }>();
   return {
     async getCompanyNews(inputSymbol) {
-      const symbol = inputSymbol.trim().toUpperCase();
+      const symbol = normalizeStockSymbol(inputSymbol);
       if (!symbol) return [];
       const cached = cache.get(symbol);
       if (cached && cached.expiresAt > Date.now()) return cached.articles;

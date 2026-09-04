@@ -42,7 +42,7 @@ function isNewsSummary(value: unknown): value is NewsAISummary {
     && typeof summary.generatedAt === 'string';
 }
 
-async function postAI(fetchImpl: typeof fetch, path: string, request: unknown): Promise<AIResponseBody> {
+async function postGemini(fetchImpl: typeof fetch, path: string, request: unknown, feature = 'AI Support'): Promise<AIResponseBody> {
   let response: Response;
   try {
     response = await fetchImpl(path, {
@@ -56,7 +56,7 @@ async function postAI(fetchImpl: typeof fetch, path: string, request: unknown): 
   let body: AIResponseBody;
   try { body = await response.json() as AIResponseBody; }
   catch { throw new AppError('NETWORK', 'Gemini returned an unreadable response.', true); }
-  if (body.launchAsset) throw new AppError('CONFIGURATION', 'Restart the Expo server to load AI Support.', false);
+  if (body.launchAsset) throw new AppError('CONFIGURATION', `Restart the Expo server to load ${feature}.`, false);
   if (!response.ok) {
     const message = typeof body.message === 'string' ? body.message : 'Gemini is temporarily unavailable.';
     throw new AppError(response.status === 503 ? 'CONFIGURATION' : 'NETWORK', message, response.status === 429 || response.status >= 500);
@@ -92,48 +92,26 @@ function isTaskOutput(value: unknown): value is ResearchTaskOutputDraft {
       && isStringArray((section as Record<string, unknown>).bullets));
 }
 
-async function postResearchTask(fetchImpl: typeof fetch, body: unknown): Promise<AIResponseBody> {
-  let response: Response;
-  try {
-    response = await fetchImpl('/api/ai/research-task', {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new AppError('NETWORK', 'Could not reach the Gemini research-task service.', true);
-  }
-  let result: AIResponseBody;
-  try { result = await response.json() as AIResponseBody; }
-  catch { throw new AppError('NETWORK', 'Gemini returned an unreadable research-task response.', true); }
-  if (result.launchAsset) throw new AppError('CONFIGURATION', 'Restart the Expo server to load Research Tasks.', false);
-  if (!response.ok) {
-    const message = typeof result.message === 'string' ? result.message : 'Gemini could not complete the research task.';
-    throw new AppError(response.status === 503 ? 'CONFIGURATION' : 'NETWORK', message, response.status === 429 || response.status >= 500);
-  }
-  return result;
-}
-
 /** Calls the Expo server route so the Gemini credential never enters the mobile bundle. */
 export function createGeminiService(fetchImpl: typeof fetch = fetch): AIService {
   return {
     async analyzeCompany(request) {
-      const body = await postAI(fetchImpl, '/api/ai/analyze', request);
+      const body = await postGemini(fetchImpl, '/api/ai/analyze', request);
       if (!isAnalysis(body.analysis)) throw new AppError('SERVICE', 'Gemini returned an invalid analysis format.', true);
       return body.analysis;
     },
     async summarizeNews(request) {
-      const body = await postAI(fetchImpl, '/api/ai/news-summary', request);
+      const body = await postGemini(fetchImpl, '/api/ai/news-summary', request, 'News Analysis');
       if (!isNewsSummary(body.summary)) throw new AppError('SERVICE', 'Gemini returned an invalid news summary format.', true);
       return body.summary;
     },
     async structureResearchTask(prompt) {
-      const body = await postResearchTask(fetchImpl, { action: 'structure', prompt });
+      const body = await postGemini(fetchImpl, '/api/ai/research-task', { action: 'structure', prompt }, 'Research Tasks');
       if (!isTaskDraft(body.draft)) throw new AppError('SERVICE', 'Gemini returned an invalid task configuration.', true);
       return body.draft.type === 'alert' ? { ...body.draft, reportStyle: undefined } : body.draft;
     },
     async generateResearchTaskOutput(task, evidence) {
-      const body = await postResearchTask(fetchImpl, { action: 'generate', task, evidence });
+      const body = await postGemini(fetchImpl, '/api/ai/research-task', { action: 'generate', task, evidence }, 'Research Tasks');
       if (!isTaskOutput(body.output)) throw new AppError('SERVICE', 'Gemini returned an invalid task output.', true);
       return body.output;
     },
@@ -141,18 +119,13 @@ export function createGeminiService(fetchImpl: typeof fetch = fetch): AIService 
 }
 
 export function createUnavailableAIService(): AIService {
+  const unavailable = (message: string) => async (): Promise<never> => {
+    throw new AppError('CONFIGURATION', message, false);
+  };
   return {
-    analyzeCompany: async () => {
-      throw new AppError('CONFIGURATION', 'Gemini AI Support is not configured.', false);
-    },
-    summarizeNews: async () => {
-      throw new AppError('CONFIGURATION', 'Gemini News Analysis is not configured.', false);
-    },
-    structureResearchTask: async () => {
-      throw new AppError('CONFIGURATION', 'Gemini Research Tasks are not configured.', false);
-    },
-    generateResearchTaskOutput: async () => {
-      throw new AppError('CONFIGURATION', 'Gemini Research Tasks are not configured.', false);
-    },
+    analyzeCompany: unavailable('Gemini AI Support is not configured.'),
+    summarizeNews: unavailable('Gemini News Analysis is not configured.'),
+    structureResearchTask: unavailable('Gemini Research Tasks are not configured.'),
+    generateResearchTaskOutput: unavailable('Gemini Research Tasks are not configured.'),
   };
 }

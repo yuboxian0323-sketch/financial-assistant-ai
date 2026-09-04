@@ -1,4 +1,5 @@
 import type { StockHistory, StockHistoryRange, StockPricePoint } from '@/types/domain';
+import { normalizeStockSymbol } from '@/utils/stocks';
 
 const requestTimeoutMs = 10_000;
 const stockSymbolPattern = /^[A-Z0-9][A-Z0-9._:-]{0,31}$/;
@@ -24,7 +25,7 @@ interface YahooChartResponse {
 
 function parseRequest(request: Request): { symbol: string; range: StockHistoryRange } | null {
   const params = new URL(request.url).searchParams;
-  const symbol = (params.get('symbol') ?? '').trim().toUpperCase();
+  const symbol = normalizeStockSymbol(params.get('symbol') ?? '');
   const range = (params.get('range') ?? '') as StockHistoryRange;
   return stockSymbolPattern.test(symbol) && Object.prototype.hasOwnProperty.call(rangeConfiguration, range) ? { symbol, range } : null;
 }

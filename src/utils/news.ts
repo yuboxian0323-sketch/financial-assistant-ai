@@ -19,6 +19,15 @@ const namedEntities: Record<string, string> = {
   '&nbsp;': ' ',
 };
 
+export function isWebUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    return ['https:', 'http:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
 /** Normalizes common provider encoding artifacts without interpreting HTML markup. */
 export function cleanNewsText(input: string): string {
   let output = input;

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
-  ActivityIndicator, Modal as NativeModal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, FlatList, Modal as NativeModal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput,
   type TextInputProps, type TextProps, type ViewStyle, View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -9,7 +9,9 @@ import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { theme } from '@/theme';
+import type { CalendarEventItem } from '@/types/domain';
 import { initials } from '@/utils/format';
+import type { PriceChartMode } from './InteractivePriceChart';
 
 export { InteractivePriceChart, type PriceChartMode } from './InteractivePriceChart';
 
@@ -36,6 +38,32 @@ export function Button({ label, onPress, variant = 'primary', size = 'medium', l
 
 export function SectionHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return <View style={styles.sectionHeader}><View style={styles.flex}><Text accessibilityRole="header" style={styles.heading}>{title}</Text>{subtitle && <Text style={styles.caption}>{subtitle}</Text>}</View>{action}</View>;
+}
+
+export function ActionLink({ label, onPress, prominent }: { label: string; onPress: () => void; prominent?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.actionLink, pressed && styles.pressed]}><AppText variant={prominent ? 'heading' : 'caption'} style={styles.actionLinkText}>{label}</AppText><Ionicons name="chevron-forward" size={prominent ? 17 : 16} color={theme.colors.accent} /></Pressable>;
+}
+
+export function BulletList({ items }: { items: string[] }) {
+  return <View style={styles.bulletList}>{items.map((item, index) => <View key={`${index}-${item}`} style={styles.bulletRow}><View style={styles.bullet} /><AppText tone="secondary" style={styles.flex}>{item}</AppText></View>)}</View>;
+}
+
+export function MetadataRow({ label, value, compact }: { label: string; value: string; compact?: boolean }) {
+  return <View style={styles.metadataRow}><AppText variant="caption" tone="muted">{label}</AppText><AppText variant={compact ? 'caption' : 'body'} style={styles.flex}>{value}</AppText></View>;
+}
+
+export function ChartModeToggle({ value, onChange }: { value: PriceChartMode; onChange: (mode: PriceChartMode) => void }) {
+  return <View accessibilityRole="tablist" style={styles.chartModeToggle}>{(['line', 'bar'] as const).map((mode) => {
+    const selected = value === mode;
+    return <Pressable key={mode} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => onChange(mode)} style={({ pressed }) => [styles.chartModeButton, selected && styles.chartModeSelected, pressed && styles.pressed]}><Ionicons name={mode === 'line' ? 'analytics-outline' : 'bar-chart-outline'} size={18} color={selected ? theme.colors.accent : theme.colors.textSecondary} /><AppText variant="caption" style={selected ? styles.actionLinkText : undefined}>{mode === 'line' ? 'Line' : 'Bars'}</AppText></Pressable>;
+  })}</View>;
+}
+
+export function CalendarEvents({ items, subtitle, onViewAll }: { items: CalendarEventItem[]; subtitle: string; onViewAll: () => void }) {
+  return <View style={styles.collectionSection}><SectionHeader title="Upcoming Events" subtitle={subtitle} action={<ActionLink label="View calendar" onPress={onViewAll} />} /><FlatList data={items} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(item) => item.id} contentContainerStyle={styles.horizontalList} renderItem={({ item }) => {
+    const date = new Date(item.date);
+    return <View style={styles.eventCard}><View style={styles.dateBadge}><AppText variant="caption" tone="secondary">{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</AppText><AppText variant="title">{date.getDate()}</AppText></View><AppText variant="heading">{item.title}</AppText><AppText variant="caption" tone="muted">{item.relativeLabel}</AppText></View>;
+  }} /></View>;
 }
 
 export function SearchBar({ value, onChangeText, placeholder = 'Search companies', ...props }: TextInputProps & { value: string; onChangeText: (value: string) => void }) {
@@ -102,6 +130,10 @@ export function AppModal({ visible, title, onClose, children }: PropsWithChildre
   return <NativeModal transparent animationType="fade" visible={visible} onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><SectionHeader title={title} action={<Pressable accessibilityLabel="Close modal" accessibilityRole="button" hitSlop={12} onPress={onClose}><Ionicons name="close" size={24} color={theme.colors.text} /></Pressable>} />{children}</View></View></NativeModal>;
 }
 
+export function ConfirmModal({ visible, title, description, confirmLabel, cancelLabel = 'Cancel', loading, onConfirm, onClose, children }: PropsWithChildren<{ visible: boolean; title: string; description: string; confirmLabel: string; cancelLabel?: string; loading?: boolean; onConfirm: () => void; onClose: () => void }>) {
+  return <AppModal visible={visible} title={title} onClose={onClose}><AppText tone="secondary">{description}</AppText>{children}<View style={styles.modalActions}><Button label={cancelLabel} variant="ghost" disabled={loading} onPress={onClose} /><Button label={confirmLabel} loading={loading} onPress={onConfirm} /></View></AppModal>;
+}
+
 export function BottomSheet({ visible, title, onClose, children }: PropsWithChildren<{ visible: boolean; title: string; onClose: () => void }>) {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(0);
@@ -158,6 +190,19 @@ const styles = StyleSheet.create({
   button_primary: { backgroundColor: theme.colors.accent }, button_secondary: { backgroundColor: theme.colors.surfaceElevated }, button_ghost: { backgroundColor: theme.colors.transparent },
   buttonText: { ...theme.type.heading, color: theme.colors.text }, buttonTextPrimary: { color: theme.colors.background },
   sectionHeader: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
+  actionLink: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs },
+  actionLinkText: { color: theme.colors.accent, fontWeight: '700' },
+  bulletList: { gap: theme.spacing.md },
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
+  bullet: { width: 7, height: 7, borderRadius: theme.radius.pill, backgroundColor: theme.colors.accent, marginTop: theme.spacing.sm },
+  metadataRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
+  chartModeToggle: { alignSelf: 'flex-end', flexDirection: 'row', gap: theme.spacing.sm },
+  chartModeButton: { minWidth: 88, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.xs, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
+  chartModeSelected: { backgroundColor: theme.colors.accentSoft },
+  collectionSection: { gap: theme.spacing.md },
+  horizontalList: { gap: theme.spacing.md },
+  eventCard: { width: 154, minHeight: 166, gap: theme.spacing.sm, padding: theme.spacing.lg, borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
+  dateBadge: { width: 58, height: 62, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.md, backgroundColor: theme.colors.accentSoft, borderWidth: 1, borderColor: theme.colors.accent },
   search: { minHeight: 48, backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, flexDirection: 'row', alignItems: 'center', paddingHorizontal: theme.spacing.md, gap: theme.spacing.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
   searchInput: { flex: 1, ...theme.type.body, color: theme.colors.text, paddingVertical: theme.spacing.md },
   avatar: { backgroundColor: theme.colors.accentSoft, alignItems: 'center', justifyContent: 'center' }, avatarText: { ...theme.type.caption, color: theme.colors.accent },
@@ -169,6 +214,7 @@ const styles = StyleSheet.create({
   skeleton: { backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.md },
   modalBackdrop: { flex: 1, justifyContent: 'center', padding: theme.spacing.xl, backgroundColor: theme.colors.overlay },
   modalCard: { backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.lg },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: theme.spacing.sm },
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: theme.colors.overlay },
   sheet: { backgroundColor: theme.colors.surfaceElevated, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.md },
   handle: { width: 40, height: 4, borderRadius: theme.radius.pill, backgroundColor: theme.colors.border, alignSelf: 'center' },

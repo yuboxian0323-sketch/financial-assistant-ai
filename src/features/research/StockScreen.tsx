@@ -6,10 +6,11 @@ import { CompanyNewsFeed } from '@/features/research/CompanyNewsFeed';
 import { StockHistoryChart } from '@/features/research/StockHistoryChart';
 import { useCompanyNews, useStockQuotes } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
+import { normalizeStockSymbol } from '@/utils/stocks';
 
 export function StockScreen() {
   const params = useLocalSearchParams<{ symbol: string; name?: string; type?: string }>();
-  const symbol = (params.symbol ?? '').trim().toUpperCase();
+  const symbol = normalizeStockSymbol(params.symbol ?? '');
   const title = params.name || symbol || 'Stock';
   const quoteQuery = useStockQuotes(symbol ? [symbol] : []);
   const newsQuery = useCompanyNews(symbol);

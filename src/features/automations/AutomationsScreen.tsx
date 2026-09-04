@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
-import { AppModal, AppText, Button, Card, Divider, EmptyState, LoadingSkeleton, Screen, SectionHeader, Tag } from '@/components';
+import { AppText, Button, Card, ConfirmModal, Divider, EmptyState, LoadingSkeleton, MetadataRow, Screen, SectionHeader, Tag } from '@/components';
 import {
   useDeleteResearchTask,
   useDuplicateResearchTask,
@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
 import type { ResearchTask } from '@/types/domain';
+import { formatDateTime, formatRelativeTime, isToday } from '@/utils/format';
 
 const templates = [
   { category: 'Daily', name: 'Morning Market Brief', prompt: 'Generate a concise market and portfolio research brief every weekday morning.' },
@@ -59,7 +60,7 @@ export function AutomationsScreen() {
       <View style={styles.stats}>
         <Stat value={String(running.length)} label="Running" />
         <Stat value={String(updatedToday)} label="Updated today" />
-        <Stat value={formatRelative(lastRun)} label="Last AI run" />
+        <Stat value={formatRelativeTime(lastRun)} label="Last AI run" />
       </View>
       <Button label="Create Research Task" icon="add" onPress={() => router.push('/research-task/new')} />
       <Button label="Test iPhone notification" variant="secondary" icon="notifications-outline" onPress={() => testNotification.mutate()} loading={testNotification.isPending} />
@@ -94,7 +95,7 @@ export function AutomationsScreen() {
       {outputsQuery.isLoading ? <LoadingSkeleton preset="card" /> : (outputsQuery.data?.length ?? 0) > 0 ? outputsQuery.data?.slice(0, 4).map((output) => {
         const task = tasks.find((item) => item.id === output.taskId);
         return <Card key={output.taskId} onPress={() => router.push({ pathname: '/research-task/[id]', params: { id: output.taskId } })}>
-          <View style={styles.rowBetween}><Tag label={task?.type === 'alert' ? 'Alert' : 'Report'} /><AppText variant="caption" tone="muted">{formatDate(output.generatedAt)}</AppText></View>
+          <View style={styles.rowBetween}><Tag label={task?.type === 'alert' ? 'Alert' : 'Report'} /><AppText variant="caption" tone="muted">{formatDateTime(output.generatedAt)}</AppText></View>
           <AppText variant="heading">{output.title}</AppText>
           <AppText tone="secondary">{output.summary}</AppText>
         </Card>;
@@ -118,11 +119,7 @@ export function AutomationsScreen() {
       </Card>)}
     </View>
 
-    <AppModal visible={Boolean(taskToDelete)} title="Delete research task?" onClose={() => setTaskToDelete(null)}>
-      <AppText tone="secondary">{taskToDelete ? `This permanently removes “${taskToDelete.name}” and its latest output from this device.` : ''}</AppText>
-      <Button label="Delete task" onPress={() => taskToDelete && remove.mutate(taskToDelete.id, { onSuccess: () => setTaskToDelete(null) })} loading={remove.isPending} />
-      <Button label="Keep task" variant="ghost" onPress={() => setTaskToDelete(null)} disabled={remove.isPending} />
-    </AppModal>
+    <ConfirmModal visible={Boolean(taskToDelete)} title="Delete research task?" description={taskToDelete ? `This permanently removes “${taskToDelete.name}” and its latest output from this device.` : ''} confirmLabel="Delete task" cancelLabel="Keep task" loading={remove.isPending} onClose={() => setTaskToDelete(null)} onConfirm={() => taskToDelete && remove.mutate(taskToDelete.id, { onSuccess: () => setTaskToDelete(null) })} />
   </Screen>;
 }
 
@@ -138,9 +135,9 @@ function TaskCard({ task, onView, onEdit, onToggle, onDuplicate, onDelete, busy 
     <AppText tone="secondary">{task.description}</AppText>
     <View style={styles.tags}>{task.monitors.slice(0, 4).map((monitor) => <Tag key={monitor} label={monitor} />)}</View>
     <Divider />
-    <Meta label="Schedule" value={task.scheduleLabel} />
-    <Meta label="Last run" value={formatDate(task.lastRunAt, 'Not run yet')} />
-    <Meta label="Next run" value={task.status === 'paused' ? 'Paused' : formatDate(task.nextRunAt, task.scheduleType === 'event' ? 'Waiting for event' : 'Not scheduled')} />
+    <MetadataRow compact label="Schedule" value={task.scheduleLabel} />
+    <MetadataRow compact label="Last run" value={formatDateTime(task.lastRunAt, 'Not run yet')} />
+    <MetadataRow compact label="Next run" value={task.status === 'paused' ? 'Paused' : formatDateTime(task.nextRunAt, task.scheduleType === 'event' ? 'Waiting for event' : 'Not scheduled')} />
     <View style={styles.buttons}>
       <Button label="View" size="small" onPress={onView} />
       <Button label={task.status === 'running' ? 'Pause' : 'Resume'} size="small" variant="secondary" onPress={onToggle} disabled={busy} />
@@ -151,33 +148,8 @@ function TaskCard({ task, onView, onEdit, onToggle, onDuplicate, onDelete, busy 
   </Card>;
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
-  return <View style={styles.meta}><AppText variant="caption" tone="muted">{label}</AppText><AppText variant="caption" style={styles.flex}>{value}</AppText></View>;
-}
-
 function Stat({ value, label }: { value: string; label: string }) {
   return <View style={styles.stat}><AppText variant="title">{value}</AppText><AppText variant="caption" tone="muted">{label}</AppText></View>;
-}
-
-function isToday(value?: string): boolean {
-  if (!value) return false;
-  const date = new Date(value);
-  const now = new Date();
-  return date.toDateString() === now.toDateString();
-}
-
-function formatDate(value?: string, fallback = 'Unavailable'): string {
-  if (!value) return fallback;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
-
-function formatRelative(value?: string): string {
-  if (!value) return 'Never';
-  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60_000));
-  if (minutes < 60) return `${minutes}m ago`;
-  if (minutes < 1_440) return `${Math.round(minutes / 60)}h ago`;
-  return `${Math.round(minutes / 1_440)}d ago`;
 }
 
 const styles = StyleSheet.create({
@@ -187,7 +159,6 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
   stats: { flexDirection: 'row', gap: theme.spacing.sm },
   stat: { flex: 1, minHeight: 76, justifyContent: 'center', padding: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceElevated },
-  meta: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md },
   gridCard: { width: '47%', minWidth: 150 },

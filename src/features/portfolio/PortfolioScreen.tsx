@@ -3,10 +3,12 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import {
-  AppModal,
   AppText,
-  Button,
+  ActionLink,
+  BulletList,
+  CalendarEvents,
   Card,
+  ConfirmModal,
   CompanyLogo,
   EmptyState,
   LoadingSkeleton,
@@ -19,7 +21,6 @@ import { useUIStore } from '@/features/ui/store';
 import { usePortfolio, usePortfolioOverview, useRemovePortfolioHolding } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
 import type {
-  CalendarEventItem,
   CompositionSlice,
   Holding,
   PortfolioCompositionView,
@@ -75,7 +76,7 @@ export function PortfolioScreen() {
         watchItems={data.watchItems}
         researchIdeas={data.researchIdeas}
       />
-      <PortfolioEvents items={data.upcomingEvents} />
+      <CalendarEvents items={data.upcomingEvents} subtitle="Tracked companies and major macro events" onViewAll={() => router.navigate('/automations')} />
     </Screen>
   );
 }
@@ -125,14 +126,9 @@ function Positions({ holdings }: { holdings: Holding[] }) {
       </View>;
     })}
   </Card>
-  <AppModal visible={Boolean(selected)} title={`Remove ${selected?.company.ticker ?? 'position'}?`} onClose={() => setSelected(null)}>
-    <AppText tone="secondary">Only the manual portfolio position will be removed. The company research record, notes, and saved knowledge stay available.</AppText>
+  <ConfirmModal visible={Boolean(selected)} title={`Remove ${selected?.company.ticker ?? 'position'}?`} description="Only the manual portfolio position will be removed. The company research record, notes, and saved knowledge stay available." confirmLabel="Remove position" cancelLabel="Keep position" loading={removeHolding.isPending} onClose={() => setSelected(null)} onConfirm={remove}>
     {removeHolding.error && <AppText style={styles.removeError}>{removeHolding.error.message}</AppText>}
-    <View style={styles.modalActions}>
-      <View style={styles.flex}><Button label="Keep position" variant="ghost" onPress={() => setSelected(null)} /></View>
-      <View style={styles.flex}><Button label="Remove position" icon="trash-outline" loading={removeHolding.isPending} onPress={remove} /></View>
-    </View>
-  </AppModal>
+  </ConfirmModal>
   </>;
 }
 
@@ -142,7 +138,7 @@ function Favorites({ favorites }: { favorites: PortfolioFavorite[] }) {
       <SectionHeader
         title="Favorites"
         subtitle={`${favorites.length} actively tracked companies`}
-        action={<TextLink label="View all" onPress={() => router.navigate('/research')} />}
+        action={<ActionLink label="View all" onPress={() => router.navigate('/research')} />}
       />
       <View>
         {favorites.map((favorite, index) => (
@@ -202,16 +198,9 @@ function PortfolioBrief({ bullets }: { bullets: string[] }) {
       <SectionHeader
         title="AI Portfolio Brief"
         subtitle="Sample interpretation · no AI model used"
-        action={<TextLink label="View full report" onPress={() => router.navigate('/workspace')} />}
+        action={<ActionLink label="View full report" onPress={() => router.navigate('/workspace')} />}
       />
-      <View style={styles.bulletList}>
-        {bullets.map((bullet) => (
-          <View key={bullet} style={styles.bulletRow}>
-            <View style={styles.bullet} />
-            <AppText tone="secondary" style={styles.flex}>{bullet}</AppText>
-          </View>
-        ))}
-      </View>
+      <BulletList items={bullets} />
     </Card>
   );
 }
@@ -292,52 +281,6 @@ function InsightGroup({ title, icon, color, items }: {
   );
 }
 
-function PortfolioEvents({ items }: { items: CalendarEventItem[] }) {
-  return (
-    <View style={styles.section}>
-      <SectionHeader
-        title="Upcoming Events"
-        subtitle="Tracked companies and major macro events"
-        action={<TextLink label="View calendar" onPress={() => router.navigate('/automations')} />}
-      />
-      <FlatList
-        data={items}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.eventList}
-        renderItem={({ item }) => {
-          const date = new Date(item.date);
-          return (
-            <View style={styles.eventCard}>
-              <View style={styles.dateBadge}>
-                <AppText variant="caption" tone="secondary">{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</AppText>
-                <AppText variant="title">{date.getDate()}</AppText>
-              </View>
-              <AppText variant="heading">{item.title}</AppText>
-              <AppText variant="caption" tone="muted">{item.relativeLabel}</AppText>
-            </View>
-          );
-        }}
-      />
-    </View>
-  );
-}
-
-function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.textLink, pressed && styles.pressed]}
-    >
-      <AppText variant="caption" style={styles.linkText}>{label}</AppText>
-      <Ionicons name="chevron-forward" size={16} color={theme.colors.accent} />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   section: { gap: theme.spacing.md },
   flex: { flex: 1 },
@@ -345,16 +288,12 @@ const styles = StyleSheet.create({
   position: { minHeight: 76, flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.sm },
   positionMain: { flex: 1, minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
   removeButton: { width: 44, height: 44, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center', marginLeft: theme.spacing.sm },
-  modalActions: { flexDirection: 'row', gap: theme.spacing.md },
   removeError: { color: theme.colors.negative },
   favoriteDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border },
   favoriteHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
   quoteColumn: { alignItems: 'flex-end' },
   favoriteMeta: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md },
   stars: { flexDirection: 'row', gap: 2 },
-  bulletList: { gap: theme.spacing.md },
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
-  bullet: { width: 7, height: 7, borderRadius: theme.radius.pill, backgroundColor: theme.colors.accent, marginTop: theme.spacing.sm },
   segmentList: { gap: theme.spacing.sm },
   compositionBar: { height: 22, flexDirection: 'row', overflow: 'hidden', borderRadius: theme.radius.pill, backgroundColor: theme.colors.surfaceMuted },
   legend: { gap: theme.spacing.md },
@@ -365,10 +304,5 @@ const styles = StyleSheet.create({
   insightHeading: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   insightRow: { minHeight: 54, flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
   insightMarker: { width: 7, height: 7, borderRadius: theme.radius.pill, marginTop: theme.spacing.sm },
-  eventList: { gap: theme.spacing.md },
-  eventCard: { width: 156, minHeight: 166, gap: theme.spacing.sm, padding: theme.spacing.lg, borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
-  dateBadge: { width: 58, height: 62, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.md, backgroundColor: theme.colors.accentSoft, borderWidth: 1, borderColor: theme.colors.accent },
-  textLink: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs },
-  linkText: { color: theme.colors.accent },
   pressed: { opacity: theme.opacity.pressed },
 });

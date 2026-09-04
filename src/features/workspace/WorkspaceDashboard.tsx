@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, { LinearTransition, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { AppModal, AppText, Button, Card, EmptyState, LoadingSkeleton, Pill, SectionHeader, Tag } from '@/components';
+import { AppModal, AppText, Button, Card, ConfirmModal, EmptyState, LoadingSkeleton, Pill, SectionHeader, Tag } from '@/components';
 import { useUIStore } from '@/features/ui/store';
 import {
   useAddWorkspacePage, useCompanies, useCompanyContent, useCompanyNews, useDeleteWorkspacePage,
@@ -129,14 +129,8 @@ export function WorkspaceDashboard({ company }: { company: Company }) {
       <TextInput autoFocus accessibilityLabel="Workspace page name" value={pageName} onChangeText={setPageName} maxLength={32} placeholder="Page name" placeholderTextColor={theme.colors.textMuted} style={styles.input} />
       <View style={styles.modalActions}><Button label="Cancel" variant="ghost" onPress={() => setPageDialog(null)} /><Button label={pageDialog === 'add' ? 'Add Page' : 'Rename'} loading={addPage.isPending || renamePage.isPending} onPress={submitPageDialog} /></View>
     </AppModal>
-    <AppModal visible={deletePage} title="Delete this page?" onClose={() => setDeletePage(false)}>
-      <AppText tone="secondary">“{activePage.name}” and all widgets on it will be removed. Other pages are unaffected.</AppText>
-      <View style={styles.modalActions}><Button label="Cancel" variant="ghost" onPress={() => setDeletePage(false)} /><Button label="Delete Page" loading={removePage.isPending} onPress={confirmDeletePage} /></View>
-    </AppModal>
-    <AppModal visible={Boolean(deleteWidget)} title="Remove this widget?" onClose={() => setDeleteWidget(null)}>
-      <AppText tone="secondary">This removes the widget from the layout. It does not delete any company data.</AppText>
-      <View style={styles.modalActions}><Button label="Cancel" variant="ghost" onPress={() => setDeleteWidget(null)} /><Button label="Remove Widget" loading={removeWidget.isPending} onPress={() => deleteWidget && removeWidget.mutate({ pageId: activePage.id, widgetId: deleteWidget.id }, { onSuccess: () => setDeleteWidget(null) })} /></View>
-    </AppModal>
+    <ConfirmModal visible={deletePage} title="Delete this page?" description={`“${activePage.name}” and all widgets on it will be removed. Other pages are unaffected.`} confirmLabel="Delete Page" loading={removePage.isPending} onClose={() => setDeletePage(false)} onConfirm={confirmDeletePage} />
+    <ConfirmModal visible={Boolean(deleteWidget)} title="Remove this widget?" description="This removes the widget from the layout. It does not delete any company data." confirmLabel="Remove Widget" loading={removeWidget.isPending} onClose={() => setDeleteWidget(null)} onConfirm={() => deleteWidget && removeWidget.mutate({ pageId: activePage.id, widgetId: deleteWidget.id }, { onSuccess: () => setDeleteWidget(null) })} />
     <WidgetSettingsModal widget={configureWidget} saving={updateSettings.isPending} onClose={() => setConfigureWidget(null)} onSave={saveWidgetSettings} />
     <WidgetSizeModal widget={resizeTarget} saving={resizeWidget.isPending} onClose={() => setResizeTarget(null)} onSelect={(size) => {
       if (!resizeTarget) return;

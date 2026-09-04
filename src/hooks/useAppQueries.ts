@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/providers/AppProviders';
 import type { CompanyContent, ResearchTask, ResearchTaskDraft, StockHistoryRange, WorkspaceLayout, WorkspaceWidgetSettings, WorkspaceWidgetSize, WorkspaceWidgetType } from '@/types/domain';
+import { normalizeStockSymbol, normalizeStockSymbols } from '@/utils/stocks';
 
 export function useCompanies(search = '') {
   const { company } = useServices();
@@ -79,7 +80,7 @@ export function useStockSearch(search: string) {
 }
 export function useStockQuotes(inputSymbols: string[]) {
   const { marketData } = useServices();
-  const symbols = Array.from(new Set(inputSymbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))).sort();
+  const symbols = normalizeStockSymbols(inputSymbols);
   return useQuery({
     queryKey: ['stock-quotes', ...symbols],
     queryFn: () => marketData.getQuotes(symbols),
@@ -89,7 +90,7 @@ export function useStockQuotes(inputSymbols: string[]) {
 }
 export function useStockHistory(symbol: string, range: StockHistoryRange, enabled = true) {
   const { marketData } = useServices();
-  const normalizedSymbol = symbol.trim().toUpperCase();
+  const normalizedSymbol = normalizeStockSymbol(symbol);
   return useQuery({
     queryKey: ['stock-history', normalizedSymbol, range],
     queryFn: () => marketData.getHistory(normalizedSymbol, range),
@@ -100,7 +101,7 @@ export function useStockHistory(symbol: string, range: StockHistoryRange, enable
 
 export function useCompanyNews(symbol: string) {
   const { news } = useServices();
-  const normalizedSymbol = symbol.trim().toUpperCase();
+  const normalizedSymbol = normalizeStockSymbol(symbol);
   return useQuery({
     queryKey: ['company-news', normalizedSymbol],
     queryFn: () => news.getCompanyNews(normalizedSymbol),
@@ -201,20 +202,17 @@ function useWorkspaceMutation<TInput>(mutationFn: (input: TInput) => Promise<Wor
 }
 
 export function useAddWorkspacePage() {
-  const { workspace } = useServices();
-  return useWorkspaceMutation((name: string) => workspace.addPage(name));
+  return useWorkspaceMutation(useServices().workspace.addPage);
 }
 export function useRenameWorkspacePage() {
   const { workspace } = useServices();
   return useWorkspaceMutation(({ pageId, name }: { pageId: string; name: string }) => workspace.renamePage(pageId, name));
 }
 export function useDuplicateWorkspacePage() {
-  const { workspace } = useServices();
-  return useWorkspaceMutation((pageId: string) => workspace.duplicatePage(pageId));
+  return useWorkspaceMutation(useServices().workspace.duplicatePage);
 }
 export function useDeleteWorkspacePage() {
-  const { workspace } = useServices();
-  return useWorkspaceMutation((pageId: string) => workspace.deletePage(pageId));
+  return useWorkspaceMutation(useServices().workspace.deletePage);
 }
 export function useMoveWorkspacePage() {
   const { workspace } = useServices();

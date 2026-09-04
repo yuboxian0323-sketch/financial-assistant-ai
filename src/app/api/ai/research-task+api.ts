@@ -1,5 +1,6 @@
 import type { ResearchTaskDraft, ResearchTaskOutputDraft } from '@/types/domain';
-import { GeminiProviderError, generateStructuredGemini } from '@/services/geminiServer';
+import { generateStructuredGemini } from '@/services/geminiServer';
+import { geminiErrorResponse, isRecord, isStringArray, jsonError, noStoreJson, parseModelJson, readJsonRequest } from '@/services/geminiRoute';
 
 const draftSchema = {
   type: 'object',
@@ -39,49 +40,32 @@ const outputSchema = {
   required: ['title', 'summary', 'sections'],
 } as const;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object';
+function isDraft(value: unknown): value is ResearchTaskDraft {
+  return isRecord(value) && typeof value.name === 'string' && ['report', 'alert'].includes(String(value.type))
+    && typeof value.description === 'string' && isStringArray(value.monitors) && ['time', 'event'].includes(String(value.scheduleType))
+    && typeof value.scheduleLabel === 'string' && ['snapshot', 'standard', 'analyst', 'deep-research'].includes(String(value.reportStyle))
+    && isRecord(value.delivery) && typeof value.delivery.notifyWhenReady === 'boolean'
+    && typeof value.delivery.showOnHome === 'boolean' && typeof value.delivery.alertCenter === 'boolean';
 }
 
-function stringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-function parseDraft(text: string): ResearchTaskDraft | null {
-  try {
-    const value = JSON.parse(text) as unknown;
-    if (!isRecord(value) || typeof value.name !== 'string' || !['report', 'alert'].includes(String(value.type))
-      || typeof value.description !== 'string' || !stringArray(value.monitors) || !['time', 'event'].includes(String(value.scheduleType))
-      || typeof value.scheduleLabel !== 'string' || !['snapshot', 'standard', 'analyst', 'deep-research'].includes(String(value.reportStyle))
-      || !isRecord(value.delivery) || typeof value.delivery.notifyWhenReady !== 'boolean'
-      || typeof value.delivery.showOnHome !== 'boolean' || typeof value.delivery.alertCenter !== 'boolean') return null;
-    const draft = value as unknown as ResearchTaskDraft;
-    return draft.type === 'alert' ? { ...draft, reportStyle: undefined } : draft;
-  } catch { return null; }
-}
-
-function parseOutput(text: string): ResearchTaskOutputDraft | null {
-  try {
-    const value = JSON.parse(text) as unknown;
-    if (!isRecord(value) || typeof value.title !== 'string' || typeof value.summary !== 'string' || !Array.isArray(value.sections)
-      || !value.sections.every((section) => isRecord(section) && typeof section.title === 'string' && stringArray(section.bullets))) return null;
-    return value as unknown as ResearchTaskOutputDraft;
-  } catch { return null; }
+function isOutput(value: unknown): value is ResearchTaskOutputDraft {
+  return isRecord(value) && typeof value.title === 'string' && typeof value.summary === 'string' && Array.isArray(value.sections)
+    && value.sections.every((section) => isRecord(section) && typeof section.title === 'string' && isStringArray(section.bullets));
 }
 
 export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) return Response.json({ code: 'AI_NOT_CONFIGURED', message: 'Research Tasks need a GEMINI_API_KEY in .env.local.' }, { status: 503 });
-  let body: unknown;
-  try { body = await request.json(); }
-  catch { return Response.json({ code: 'INVALID_REQUEST', message: 'The Research Task request was not valid JSON.' }, { status: 400 }); }
+  if (!apiKey) return jsonError('AI_NOT_CONFIGURED', 'Research Tasks need a GEMINI_API_KEY in .env.local.', 503);
+  const result = await readJsonRequest(request, 'The Research Task request was not valid JSON.');
+  if (!result.ok) return result.response;
+  const body = result.body;
   if (!isRecord(body) || (body.action !== 'structure' && body.action !== 'generate')) {
-    return Response.json({ code: 'INVALID_REQUEST', message: 'Choose a valid Research Task action.' }, { status: 400 });
+    return jsonError('INVALID_REQUEST', 'Choose a valid Research Task action.', 400);
   }
   try {
     if (body.action === 'structure') {
       if (typeof body.prompt !== 'string' || body.prompt.trim().length < 8 || body.prompt.length > 1_000) {
-        return Response.json({ code: 'INVALID_PROMPT', message: 'Describe the research assignment in at least 8 characters.' }, { status: 400 });
+        return jsonError('INVALID_PROMPT', 'Describe the research assignment in at least 8 characters.', 400);
       }
       const output = await generateStructuredGemini({
         apiKey,
@@ -90,12 +74,13 @@ export async function POST(request: Request): Promise<Response> {
         schema: draftSchema,
         maxOutputTokens: 1_200,
       });
-      const draft = output ? parseDraft(output) : null;
-      if (!draft) return Response.json({ code: 'INVALID_AI_RESPONSE', message: 'Gemini could not structure this task.' }, { status: 502 });
-      return Response.json({ draft }, { headers: { 'Cache-Control': 'no-store' } });
+      const parsed = output ? parseModelJson(output, isDraft) : null;
+      if (!parsed) return jsonError('INVALID_AI_RESPONSE', 'Gemini could not structure this task.', 502);
+      const draft = parsed.type === 'alert' ? { ...parsed, reportStyle: undefined } : parsed;
+      return noStoreJson('draft', draft);
     }
     if (!isRecord(body.task) || !isRecord(body.evidence) || JSON.stringify(body).length > 80_000) {
-      return Response.json({ code: 'INVALID_REQUEST', message: 'The task evidence was invalid or too large.' }, { status: 400 });
+      return jsonError('INVALID_REQUEST', 'The task evidence was invalid or too large.', 400);
     }
     const output = await generateStructuredGemini({
       apiKey,
@@ -104,16 +89,10 @@ export async function POST(request: Request): Promise<Response> {
       schema: outputSchema,
       maxOutputTokens: 2_400,
     });
-    const parsed = output ? parseOutput(output) : null;
-    if (!parsed) return Response.json({ code: 'INVALID_AI_RESPONSE', message: 'Gemini could not generate a valid research output.' }, { status: 502 });
-    return Response.json({ output: parsed }, { headers: { 'Cache-Control': 'no-store' } });
+    const parsed = output ? parseModelJson(output, isOutput) : null;
+    if (!parsed) return jsonError('INVALID_AI_RESPONSE', 'Gemini could not generate a valid research output.', 502);
+    return noStoreJson('output', parsed);
   } catch (error) {
-    const kind = error instanceof GeminiProviderError ? error.kind : 'PROVIDER';
-    const status = kind === 'RATE_LIMIT' ? 429 : kind === 'CREDENTIAL' || kind === 'MODEL' ? 503 : 502;
-    const message = kind === 'RATE_LIMIT' ? 'The free Gemini rate limit was reached. Wait briefly and try again.'
-      : kind === 'CREDENTIAL' ? 'The Gemini credential was rejected.'
-        : kind === 'MODEL' ? 'The configured Gemini model is unavailable.'
-          : kind === 'TIMEOUT' ? 'Gemini did not respond in time.' : 'Gemini Research Tasks are temporarily unavailable.';
-    return Response.json({ code: 'GEMINI_ERROR', message }, { status });
+    return geminiErrorResponse(error, 'Gemini Research Tasks are temporarily unavailable.');
   }
 }

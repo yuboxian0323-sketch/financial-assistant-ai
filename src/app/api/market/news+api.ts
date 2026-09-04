@@ -1,6 +1,7 @@
 import type { NewsArticle } from '@/types/domain';
-import { cleanNewsText } from '@/utils/news';
+import { cleanNewsText, isWebUrl } from '@/utils/news';
 import { isTrustedNewsPublisher, trustedPublisherLabel } from '@/utils/newsSources';
+import { normalizeStockSymbol } from '@/utils/stocks';
 
 const requestTimeoutMs = 8_000;
 const maxArticles = 20;
@@ -19,16 +20,6 @@ interface FinnhubNewsItem {
   url?: unknown;
 }
 
-function validWebUrl(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  try {
-    const protocol = new URL(value).protocol;
-    return protocol === 'https:' || protocol === 'http:';
-  } catch {
-    return false;
-  }
-}
-
 function toArticle(symbol: string, value: unknown): NewsArticle | null {
   if (!value || typeof value !== 'object') return null;
   const item = value as FinnhubNewsItem;
@@ -36,7 +27,7 @@ function toArticle(symbol: string, value: unknown): NewsArticle | null {
     || typeof item.datetime !== 'number' || !Number.isFinite(item.datetime) || item.datetime <= 0
     || typeof item.headline !== 'string' || !item.headline.trim()
     || typeof item.source !== 'string' || !item.source.trim()
-    || !validWebUrl(item.url)) return null;
+    || !isWebUrl(item.url)) return null;
   const relatedSymbols = typeof item.related === 'string'
     ? item.related.split(',').map((related) => related.trim()).filter(Boolean)
     : [];
@@ -51,7 +42,7 @@ function toArticle(symbol: string, value: unknown): NewsArticle | null {
     category: typeof item.category === 'string' && item.category.trim() ? cleanNewsText(item.category) : 'company',
     publishedAt: new Date(item.datetime * 1_000).toISOString(),
     url: item.url,
-    imageUrl: validWebUrl(item.image) ? item.image : undefined,
+    imageUrl: isWebUrl(item.image) ? item.image : undefined,
     relatedSymbols,
     provider: 'Finnhub',
   };
@@ -62,7 +53,7 @@ function isoDate(date: Date): string {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const symbol = (new URL(request.url).searchParams.get('symbol') ?? '').trim().toUpperCase();
+  const symbol = normalizeStockSymbol(new URL(request.url).searchParams.get('symbol') ?? '');
   if (!stockSymbolPattern.test(symbol)) {
     return Response.json({ code: 'INVALID_SYMBOL', message: 'Choose a valid stock symbol for company news.' }, { status: 400 });
   }

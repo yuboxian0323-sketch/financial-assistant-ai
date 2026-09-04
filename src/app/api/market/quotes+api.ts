@@ -1,4 +1,5 @@
 import type { QuoteBatch, StockQuote } from '@/types/domain';
+import { normalizeStockSymbols } from '@/utils/stocks';
 
 const requestTimeoutMs = 8_000;
 const maxSymbolsPerRequest = 12;
@@ -17,7 +18,7 @@ interface FinnhubQuote {
 
 function parseSymbols(request: Request): string[] {
   const requested = new URL(request.url).searchParams.get('symbols') ?? '';
-  return Array.from(new Set(requested.split(',').map((symbol) => symbol.trim().toUpperCase())))
+  return normalizeStockSymbols(requested.split(','))
     .filter((symbol) => stockSymbolPattern.test(symbol))
     .slice(0, maxSymbolsPerRequest);
 }

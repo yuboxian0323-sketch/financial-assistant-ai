@@ -85,6 +85,14 @@ function pageOrThrow(layout: WorkspaceLayout, pageId: string): WorkspacePage {
   if (!page) throw new AppError('NOT_FOUND', 'Workspace page not found.', false);
   return page;
 }
+function moveItem<T>(items: T[], from: number, to: number): T[] {
+  const target = Math.max(0, Math.min(items.length - 1, to));
+  if (from === target) return items;
+  const result = [...items];
+  const [moved] = result.splice(from, 1);
+  if (moved) result.splice(target, 0, moved);
+  return result;
+}
 
 /** Creates the autosaving service used by Query hooks and keeps SQLite details out of UI code. */
 export function createWorkspaceService(repository: InvestmentRepository): WorkspaceService {
@@ -142,12 +150,8 @@ export function createWorkspaceService(repository: InvestmentRepository): Worksp
       const layout = await load();
       const from = layout.pages.findIndex((page) => page.id === pageId);
       if (from < 0) throw new AppError('NOT_FOUND', 'Workspace page not found.', false);
-      const to = Math.max(0, Math.min(layout.pages.length - 1, from + direction));
-      if (from === to) return layout;
-      const pages = [...layout.pages];
-      const [moved] = pages.splice(from, 1);
-      if (moved) pages.splice(to, 0, moved);
-      return save({ ...layout, pages });
+      const pages = moveItem(layout.pages, from, from + direction);
+      return pages === layout.pages ? layout : save({ ...layout, pages });
     },
     addWidget: (pageId, type, size, settings) => updatePage(pageId, (page) => ({
       ...page,
@@ -157,11 +161,7 @@ export function createWorkspaceService(repository: InvestmentRepository): Worksp
     moveWidget: (pageId, widgetId, toIndex) => updatePage(pageId, (page) => {
       const from = page.widgets.findIndex((item) => item.id === widgetId);
       if (from < 0) throw new AppError('NOT_FOUND', 'Workspace widget not found.', false);
-      const target = Math.max(0, Math.min(page.widgets.length - 1, toIndex));
-      const widgets = [...page.widgets];
-      const [moved] = widgets.splice(from, 1);
-      if (moved) widgets.splice(target, 0, moved);
-      return { ...page, widgets };
+      return { ...page, widgets: moveItem(page.widgets, from, toIndex) };
     }),
     resizeWidget: (pageId, widgetId, size) => updatePage(pageId, (page) => ({
       ...page, widgets: page.widgets.map((item) => item.id === widgetId ? { ...item, size } : item),

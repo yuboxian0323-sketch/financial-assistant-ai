@@ -1,5 +1,6 @@
 import type { AIAnalysis, AIAnalysisRequest } from '@/types/domain';
-import { GEMINI_MODEL, GeminiProviderError, generateStructuredGemini } from '@/services/geminiServer';
+import { GEMINI_MODEL, generateStructuredGemini } from '@/services/geminiServer';
+import { geminiErrorResponse, isRecord, isStringArray, jsonError, noStoreJson, parseModelJson, readJsonRequest } from '@/services/geminiRoute';
 
 const analysisSchema = {
   type: 'object',
@@ -14,10 +15,6 @@ const analysisSchema = {
   },
   required: ['headline', 'answer', 'keyPoints', 'risks', 'evidence', 'followUpQuestions', 'confidence'],
 } as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object';
-}
 
 function validRequest(value: unknown): value is AIAnalysisRequest {
   if (!isRecord(value) || typeof value.question !== 'string' || value.question.trim().length < 3 || value.question.length > 600) return false;
@@ -38,34 +35,21 @@ function validRequest(value: unknown): value is AIAnalysisRequest {
   return hasValidStrings && validFinancials && validQuote;
 }
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-function parseAnalysis(text: string): Omit<AIAnalysis, 'model' | 'generatedAt'> | null {
-  try {
-    const value = JSON.parse(text) as unknown;
-    if (!isRecord(value)) return null;
-    if (typeof value.headline !== 'string' || typeof value.answer !== 'string') return null;
-    if (!isStringArray(value.keyPoints) || !isStringArray(value.risks) || !isStringArray(value.evidence) || !isStringArray(value.followUpQuestions)) return null;
-    if (!['low', 'medium', 'high'].includes(String(value.confidence))) return null;
-    return value as Omit<AIAnalysis, 'model' | 'generatedAt'>;
-  } catch {
-    return null;
-  }
+function isAnalysis(value: unknown): value is Omit<AIAnalysis, 'model' | 'generatedAt'> {
+  return isRecord(value) && typeof value.headline === 'string' && typeof value.answer === 'string'
+    && isStringArray(value.keyPoints) && isStringArray(value.risks) && isStringArray(value.evidence)
+    && isStringArray(value.followUpQuestions) && ['low', 'medium', 'high'].includes(String(value.confidence));
 }
 
 export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
-    return Response.json({ code: 'AI_NOT_CONFIGURED', message: 'Gemini AI Support needs a GEMINI_API_KEY in .env.local.' }, { status: 503 });
-  }
+  if (!apiKey) return jsonError('AI_NOT_CONFIGURED', 'Gemini AI Support needs a GEMINI_API_KEY in .env.local.', 503);
 
-  let body: unknown;
-  try { body = await request.json(); }
-  catch { return Response.json({ code: 'INVALID_REQUEST', message: 'The AI request was not valid JSON.' }, { status: 400 }); }
+  const result = await readJsonRequest(request, 'The AI request was not valid JSON.');
+  if (!result.ok) return result.response;
+  const body = result.body;
   if (!validRequest(body)) {
-    return Response.json({ code: 'INVALID_REQUEST', message: 'Choose a company and enter a question between 3 and 600 characters.' }, { status: 400 });
+    return jsonError('INVALID_REQUEST', 'Choose a company and enter a question between 3 and 600 characters.', 400);
   }
 
   try {
@@ -76,17 +60,11 @@ export async function POST(request: Request): Promise<Response> {
       schema: analysisSchema,
       maxOutputTokens: 1_600,
     });
-    const parsed = output ? parseAnalysis(output) : null;
-    if (!parsed) return Response.json({ code: 'INVALID_AI_RESPONSE', message: 'Gemini returned an invalid structured response.' }, { status: 502 });
+    const parsed = output ? parseModelJson(output, isAnalysis) : null;
+    if (!parsed) return jsonError('INVALID_AI_RESPONSE', 'Gemini returned an invalid structured response.', 502);
     const analysis: AIAnalysis = { ...parsed, model: GEMINI_MODEL, generatedAt: new Date().toISOString() };
-    return Response.json({ analysis }, { headers: { 'Cache-Control': 'no-store' } });
+    return noStoreJson('analysis', analysis);
   } catch (error) {
-    const kind = error instanceof GeminiProviderError ? error.kind : 'PROVIDER';
-    const status = kind === 'RATE_LIMIT' ? 429 : kind === 'CREDENTIAL' || kind === 'MODEL' ? 503 : 502;
-    const message = kind === 'RATE_LIMIT' ? 'The free Gemini rate limit was reached. Wait briefly and try again.'
-      : kind === 'CREDENTIAL' ? 'The Gemini credential was rejected.'
-        : kind === 'MODEL' ? 'The configured Gemini model is unavailable.'
-          : kind === 'TIMEOUT' ? 'Gemini did not respond in time.' : 'Gemini is temporarily unavailable.';
-    return Response.json({ code: 'GEMINI_ERROR', message }, { status });
+    return geminiErrorResponse(error, 'Gemini is temporarily unavailable.');
   }
 }

@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'rea
 import { AppModal, AppText, Button, Card } from '@/components';
 import { useAddPortfolioHolding, usePortfolio, useRemovePortfolioHolding } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
+import { normalizeStockSymbol } from '@/utils/stocks';
 
 type PortfolioStock = {
   symbol: string;
@@ -19,7 +20,7 @@ export function AddToPortfolioButton({ stock }: { stock: PortfolioStock }) {
   const [removeVisible, setRemoveVisible] = useState(false);
   const [shares, setShares] = useState('1');
   const [averageCost, setAverageCost] = useState(stock.price.toFixed(2));
-  const normalizedSymbol = stock.symbol.trim().toUpperCase();
+  const normalizedSymbol = normalizeStockSymbol(stock.symbol);
   const existingHolding = holdings.data?.find((holding) => holding.company.ticker.toUpperCase() === normalizedSymbol);
   const alreadyAdded = Boolean(existingHolding);
   const parsedShares = Number(shares);

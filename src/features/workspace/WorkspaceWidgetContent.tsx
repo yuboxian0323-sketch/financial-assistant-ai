@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AppText, Button, Divider, EmptyState, InteractivePriceChart, Pill, ProgressIndicator, Tag, type PriceChartMode } from '@/components';
-import type { Company, CompanyContent, NewsArticle, ResearchTask, ResearchTaskOutput, StockHistory, StockHistoryRange, StockPricePoint, StockQuote, WorkspaceWidget, WorkspaceWidgetSize } from '@/types/domain';
+import { AppText, BulletList, Button, ChartModeToggle, Divider, EmptyState, InteractivePriceChart, Pill, ProgressIndicator, Tag, type PriceChartMode } from '@/components';
+import type { Company, CompanyContent, NewsArticle, ResearchTask, ResearchTaskOutput, StockHistory, StockHistoryRange, StockQuote, WorkspaceWidget, WorkspaceWidgetSize } from '@/types/domain';
 import { theme } from '@/theme';
+import { formatDateTime } from '@/utils/format';
+import { buildQuoteFallback } from '@/utils/priceHistory';
 
 export interface WorkspaceWidgetData {
   company: Company;
@@ -61,12 +63,6 @@ function priceTone(change: number) {
   return { color: change >= 0 ? theme.colors.positive : theme.colors.negative } as const;
 }
 
-function readableTime(value?: string): string {
-  if (!value) return 'Time unavailable';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Time unavailable' : date.toLocaleString();
-}
-
 /** Renders company-specific data with information density determined by widget size. */
 export function WorkspaceWidgetContent({ widget, data, interactionsDisabled = false, onOpenNews, onOpenCompany }: { widget: WorkspaceWidget; data: WorkspaceWidgetData; interactionsDisabled?: boolean; onOpenNews?: (newsId: string) => void; onOpenCompany?: (companyId: string) => void }) {
   const { company, content } = data;
@@ -120,7 +116,7 @@ export function WorkspaceWidgetContent({ widget, data, interactionsDisabled = fa
   if (widget.type === 'notes') {
     const notes = content.filter((item) => item.kind === 'note').slice(0, limits.notes);
     if (!notes.length) return <EmptyState title="No notes yet" description="Notes saved for this company will appear here." />;
-    return <View style={styles.stack}>{notes.map((note) => <View key={note.id}><AppText variant="heading">{note.title}</AppText>{widget.size !== 'small' && <AppText tone="secondary">{truncate(note.body, widget.size === 'large' ? 260 : 120)}</AppText>}{widget.size === 'large' && <AppText variant="caption" tone="muted">{readableTime(note.occurredAt)}</AppText>}</View>)}</View>;
+    return <View style={styles.stack}>{notes.map((note) => <View key={note.id}><AppText variant="heading">{note.title}</AppText>{widget.size !== 'small' && <AppText tone="secondary">{truncate(note.body, widget.size === 'large' ? 260 : 120)}</AppText>}{widget.size === 'large' && <AppText variant="caption" tone="muted">{formatDateTime(note.occurredAt, 'Time unavailable')}</AppText>}</View>)}</View>;
   }
   if (widget.type === 'latest-report') {
     const savedReports = content.filter((item) => item.kind === 'report');
@@ -152,7 +148,7 @@ function AIInsightWidget({ kind, size, company, content }: { kind: 'opportunity'
     <AppText variant={size === 'small' ? 'heading' : 'title'}>{truncate(thesis, size === 'small' ? 95 : size === 'medium' ? 280 : 700)}</AppText>
     {size !== 'small' && <><AppText variant="heading">Context</AppText><AppText tone="secondary">{truncate(company.aiSummary.replace(/^Sample AI summary:\s*/i, ''), size === 'medium' ? 180 : 520)}</AppText></>}
     {size !== 'small' && company.financials.length > 0 && <><AppText variant="heading">Metrics to verify</AppText><View style={styles.metricGrid}>{company.financials.slice(0, metricLimit).map((metric) => <QuoteFact key={metric.label} label={metric.label} value={metric.value} />)}</View></>}
-    {size === 'large' && <><AppText variant="heading">Research questions</AppText>{questions.map((question) => <View key={question} style={styles.bulletRow}><AppText tone="secondary">•</AppText><AppText tone="secondary" style={styles.flex}>{question}</AppText></View>)}{relevantResearch.length > 0 && <><AppText variant="heading">Related saved evidence</AppText>{relevantResearch.slice(0, 3).map((item) => <AppText key={item.id} tone="secondary">• {item.title}</AppText>)}</>}</>}
+    {size === 'large' && <><AppText variant="heading">Research questions</AppText><BulletList items={questions} />{relevantResearch.length > 0 && <><AppText variant="heading">Related saved evidence</AppText>{relevantResearch.slice(0, 3).map((item) => <AppText key={item.id} tone="secondary">• {item.title}</AppText>)}</>}</>}
     <AppText variant="caption" tone="muted">Based on saved company context · not financial advice.</AppText>
   </View>;
 }
@@ -166,7 +162,7 @@ function StockQuoteWidget({ size, data }: { size: WorkspaceWidgetSize; data: Wor
     <View style={styles.quoteRow}><View style={styles.flex}><AppText variant="caption" tone="secondary">{company.ticker}</AppText><AppText variant={size === 'small' ? 'title' : 'hero'}>${price.toFixed(2)}</AppText></View><AppText variant="heading" style={priceTone(changePercent)}>{changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%</AppText></View>
     {size !== 'small' && <AppText style={priceTone(change)}>{change >= 0 ? '+' : ''}${change.toFixed(2)} today</AppText>}
     {size === 'large' && <View style={styles.metricGrid}><QuoteFact label="Previous close" value={`$${(quote?.previousClose ?? price - change).toFixed(2)}`} /><QuoteFact label="Session high" value={`$${(quote?.high ?? price).toFixed(2)}`} /><QuoteFact label="Session low" value={`$${(quote?.low ?? price).toFixed(2)}`} /></View>}
-    {size !== 'small' && <AppText variant="caption" tone="muted">{quote ? 'Finnhub live quote' : 'Saved quote fallback'} · {readableTime(quote?.asOf ?? company.priceAsOf)}</AppText>}
+    {size !== 'small' && <AppText variant="caption" tone="muted">{quote ? 'Finnhub live quote' : 'Saved quote fallback'} · {formatDateTime(quote?.asOf ?? company.priceAsOf, 'Time unavailable')}</AppText>}
   </View>;
 }
 
@@ -182,7 +178,7 @@ function TradingRangeWidget({ size, data }: { size: WorkspaceWidgetSize; data: W
   return <View style={styles.stack}>
     <View style={styles.metricGrid}>{facts.map(([label, value]) => <QuoteFact key={label} label={label} value={`$${value.toFixed(2)}`} />)}</View>
     {size !== 'small' && <ProgressIndicator value={rangePosition} label={`Current $${price.toFixed(2)} · ${Math.round(rangePosition * 100)}% through today’s displayed range`} />}
-    {size === 'large' && <><Divider /><AppText tone="secondary">Today’s displayed spread is ${(high - low).toFixed(2)} points. This describes price position, not valuation or future direction.</AppText><AppText variant="caption" tone="muted">{quote ? 'Finnhub live quote' : 'Saved quote fallback'} · {readableTime(quote?.asOf ?? company.priceAsOf)}</AppText></>}
+    {size === 'large' && <><Divider /><AppText tone="secondary">Today’s displayed spread is ${(high - low).toFixed(2)} points. This describes price position, not valuation or future direction.</AppText><AppText variant="caption" tone="muted">{quote ? 'Finnhub live quote' : 'Saved quote fallback'} · {formatDateTime(quote?.asOf ?? company.priceAsOf, 'Time unavailable')}</AppText></>}
   </View>;
 }
 
@@ -205,24 +201,12 @@ function PriceChartWidget({ widget, data, interactionsDisabled }: { widget: Work
   const height = widget.size === 'small' ? 104 : widget.size === 'medium' ? 154 : 220;
   return <View style={styles.stack}>
     <View style={styles.quoteRow}><AppText variant={widget.size === 'small' ? 'heading' : 'title'}>${last.toFixed(2)}</AppText><AppText variant="heading" style={priceTone(change)}>{change >= 0 ? '+' : ''}{change.toFixed(2)}% · {range}</AppText></View>
-    {widget.size === 'large' && !interactionsDisabled && <View style={styles.selector}><Pill label="Line" selected={mode === 'line'} onPress={() => setMode('line')} /><Pill label="Bars" selected={mode === 'bar'} onPress={() => setMode('bar')} /></View>}
+    {widget.size === 'large' && !interactionsDisabled && <ChartModeToggle value={mode} onChange={setMode} />}
     <InteractivePriceChart points={points} positive={change >= 0} range={range} currency={data.history?.currency ?? 'USD'} mode={mode} height={height} testID={`workspace-price-chart-${widget.size}`} />
     {widget.size !== 'small' && !interactionsDisabled && <View style={styles.selector}>{ranges.map((item) => <Pill key={item} label={item} selected={range === item} onPress={() => data.setHistoryRange?.(item)} />)}</View>}
     {widget.size === 'large' && <AppText variant="caption" tone="muted">Drag across the chart to inspect prices · {data.historyLoading ? 'Loading live history' : data.history?.source ?? 'Illustrative quote fallback'} · market delays may apply.</AppText>}
     {widget.size === 'large' && data.historyError && !interactionsDisabled && <Button label="Retry live history" variant="secondary" size="small" onPress={data.retryHistory} />}
   </View>;
-}
-
-function buildQuoteFallback(currentPrice: number, dailyChange: number): StockPricePoint[] {
-  const previousClose = currentPrice / Math.max(0.01, 1 + dailyChange / 100);
-  const now = Date.now();
-  return Array.from({ length: 16 }, (_, index) => {
-    const progress = index / 15;
-    return {
-      timestamp: new Date(now - (15 - index) * 30 * 60_000).toISOString(),
-      close: previousClose + (currentPrice - previousClose) * progress + Math.sin(progress * Math.PI * 4) * currentPrice * 0.0015,
-    };
-  });
 }
 
 function IndustryPeersWidget({ size, company, companies, interactionsDisabled, onOpenCompany }: { size: WorkspaceWidgetSize; company: Company; companies: Company[]; interactionsDisabled: boolean; onOpenCompany?: (companyId: string) => void }) {
@@ -259,6 +243,5 @@ const styles = {
   peerRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingVertical: theme.spacing.sm } as const,
   tickerRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm } as const,
   peerPressable: { minHeight: 54, justifyContent: 'center', gap: theme.spacing.xs } as const,
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm } as const,
   thesisColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.lg } as const,
 };

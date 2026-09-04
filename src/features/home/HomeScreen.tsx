@@ -13,7 +13,11 @@ import {
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import {
   AppText,
+  ActionLink,
+  BulletList,
+  CalendarEvents,
   Card,
+  ChartModeToggle,
   CompanyLogo,
   EmptyState,
   InteractivePriceChart,
@@ -27,7 +31,6 @@ import { useUIStore } from '@/features/ui/store';
 import { useCompanyNews, useLatestResearchTaskOutputs, useResearchTasks, useSessionBrief, useStockHistory } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
 import type {
-  CalendarEventItem,
   HomeNewsCompany,
   HomeNewsItem,
   MarketIndex,
@@ -35,9 +38,10 @@ import type {
   ResearchTask,
   ResearchTaskOutput,
   StockHistoryRange,
-  StockPricePoint,
   WatchItem,
 } from '@/types/domain';
+import { capitalize, titleCase } from '@/utils/format';
+import { buildMarketFallback } from '@/utils/priceHistory';
 
 const watchIcons: Record<WatchItem['category'], keyof typeof Ionicons.glyphMap> = {
   valuation: 'trending-up',
@@ -131,7 +135,7 @@ export function HomeScreen() {
         onSelect={selectCompany}
       />
       <ThingsToWatch items={data.watchItems} />
-      <UpcomingEvents items={data.calendarEvents} />
+      <CalendarEvents items={data.calendarEvents} subtitle="Sample calendar" onViewAll={() => router.navigate('/automations')} />
     </Screen>
   );
 }
@@ -149,12 +153,12 @@ function LatestReports({ tasks, outputs, loading, error, onRetry }: {
     return task?.type === 'report' && task.delivery.showOnHome;
   }).slice(0, 3);
   return <View style={styles.section}>
-    <SectionHeader title="Latest Reports" subtitle="The current output from your saved Research Tasks" action={<TextLink label="View all" onPress={() => router.navigate('/automations')} />} />
+    <SectionHeader title="Latest Reports" subtitle="The current output from your saved Research Tasks" action={<ActionLink label="View all" onPress={() => router.navigate('/automations')} prominent />} />
     {loading ? <LoadingSkeleton preset="card" /> : error ? <EmptyState title="Reports are unavailable" description={error.message} actionLabel="Try again" onAction={onRetry} /> : reports.length === 0 ? <EmptyState title="No reports yet" description="Run a report task to place its latest output here." actionLabel="Open Research Tasks" onAction={() => router.navigate('/automations')} /> : reports.map((output) => {
       const task = taskById.get(output.taskId);
       return <Card key={output.taskId} onPress={() => router.push({ pathname: '/research-task/[id]', params: { id: output.taskId } })}>
         <View style={styles.rowBetween}>
-          <Tag label={task?.reportStyle ? `${formatReportStyle(task.reportStyle)} report` : 'Report'} />
+          <Tag label={task?.reportStyle ? `${titleCase(task.reportStyle)} report` : 'Report'} />
           <AppText variant="caption" tone="muted">{formatNewsTime(output.generatedAt)}</AppText>
         </View>
         <AppText variant="heading">{output.title}</AppText>
@@ -213,23 +217,7 @@ function MarketCarousel({ items, width }: { items: MarketIndex[]; width: number 
           );
         })}
       </View>
-      <View accessibilityRole="tablist" style={styles.chartModeSelector}>
-        {(['line', 'bar'] as const).map((option) => {
-          const selected = option === mode;
-          return (
-            <Pressable
-              key={option}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              onPress={() => setMode(option)}
-              style={({ pressed }) => [styles.chartModeButton, selected && styles.rangeButtonSelected, pressed && styles.pressed]}
-            >
-              <Ionicons name={option === 'line' ? 'analytics-outline' : 'bar-chart-outline'} size={18} color={selected ? theme.colors.accent : theme.colors.textSecondary} />
-              <AppText variant="caption" style={selected ? styles.rangeLabelSelected : undefined}>{option === 'line' ? 'Line' : 'Bars'}</AppText>
-            </Pressable>
-          );
-        })}
-      </View>
+      <ChartModeToggle value={mode} onChange={setMode} />
     </View>
   );
 }
@@ -310,15 +298,8 @@ function BriefCard({ title, icon, bullets, badge, actionLabel, onAction }: {
         </View>
         {badge ? <Tag label={badge} tone="positive" /> : null}
       </View>
-      <View style={styles.bulletList}>
-        {bullets.map((bullet) => (
-          <View key={bullet} style={styles.bulletRow}>
-            <View style={styles.bullet} />
-            <AppText tone="secondary" style={styles.flex}>{bullet}</AppText>
-          </View>
-        ))}
-      </View>
-      <TextLink label={actionLabel} onPress={onAction} />
+      <BulletList items={bullets} />
+      <ActionLink label={actionLabel} onPress={onAction} prominent />
     </Card>
   );
 }
@@ -340,7 +321,7 @@ function NewsOverview({ companies, selectedCompanyId, items, onSelect }: {
       <SectionHeader
         title="Company News Overview"
       subtitle={usingLive ? 'Preferred publishers · full summaries open inside the app' : liveNews.error ? 'Saved sample fallback · preferred live news unavailable' : 'Loading preferred live news'}
-        action={<TextLink label="View all" onPress={() => router.navigate('/research')} />}
+        action={<ActionLink label="View all" onPress={() => router.navigate('/research')} prominent />}
       />
       <FlatList
         data={companies}
@@ -374,7 +355,7 @@ function NewsOverview({ companies, selectedCompanyId, items, onSelect }: {
             <EmptyState title="No news yet" description="No recent live or saved company news is available." actionLabel={liveNews.error ? 'Retry live news' : undefined} onAction={liveNews.error ? () => { void liveNews.refetch(); } : undefined} />
           )}
       </Animated.View>
-      <TextLink label="See more news" onPress={() => router.navigate('/research')} />
+      <ActionLink label="See more news" onPress={() => router.navigate('/research')} prominent />
     </Card>
   );
 }
@@ -448,52 +429,6 @@ function ThingsToWatch({ items }: { items: WatchItem[] }) {
   );
 }
 
-function UpcomingEvents({ items }: { items: CalendarEventItem[] }) {
-  return (
-    <View style={styles.section}>
-      <SectionHeader
-        title="Upcoming Events"
-        subtitle="Sample calendar"
-        action={<TextLink label="View calendar" onPress={() => router.navigate('/automations')} />}
-      />
-      <FlatList
-        data={items}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.horizontalList}
-        renderItem={({ item }) => {
-          const date = new Date(item.date);
-          return (
-            <View style={styles.eventCard}>
-              <View style={styles.dateBadge}>
-                <AppText variant="caption" tone="secondary">{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</AppText>
-                <AppText variant="title">{date.getDate()}</AppText>
-              </View>
-              <AppText variant="heading">{item.title}</AppText>
-              <AppText variant="caption" tone="muted">{item.relativeLabel}</AppText>
-            </View>
-          );
-        }}
-      />
-    </View>
-  );
-}
-
-function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.textLink, pressed && styles.pressed]}
-    >
-      <AppText variant="heading" style={styles.linkText}>{label}</AppText>
-      <Ionicons name="chevron-forward" size={17} color={theme.colors.accent} />
-    </Pressable>
-  );
-}
-
 function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
@@ -519,31 +454,6 @@ function formatQuoteTime(value: string | undefined): string {
   return Number.isNaN(date.getTime()) ? 'Saved' : date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function buildMarketFallback(item: MarketIndex, range: MarketRange): StockPricePoint[] {
-  const durationMs: Record<MarketRange, number> = {
-    '1D': 24 * 60 * 60_000,
-    '5D': 5 * 24 * 60 * 60_000,
-    '1Y': 365 * 24 * 60 * 60_000,
-    '2Y': 730 * 24 * 60 * 60_000,
-  };
-  const now = Date.now();
-  const min = Math.min(...item.chartPoints);
-  const max = Math.max(...item.chartPoints);
-  const spread = Math.max(1, max - min);
-  return item.chartPoints.map((point, index) => ({
-    timestamp: new Date(now - durationMs[range] + (durationMs[range] * index) / Math.max(1, item.chartPoints.length - 1)).toISOString(),
-    close: item.price * (0.98 + ((point - min) / spread) * 0.02),
-  }));
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function formatReportStyle(value: string): string {
-  return value.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
-}
-
 const styles = StyleSheet.create({
   section: { gap: theme.spacing.md },
   flex: { flex: 1 },
@@ -560,12 +470,7 @@ const styles = StyleSheet.create({
   rangeButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.sm },
   rangeButtonSelected: { backgroundColor: theme.colors.accentSoft },
   rangeLabelSelected: { color: theme.colors.accent, fontWeight: '700' },
-  chartModeSelector: { alignSelf: 'flex-end', flexDirection: 'row', gap: theme.spacing.sm },
-  chartModeButton: { minWidth: 88, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.xs, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
   chartRetry: { minHeight: 44, justifyContent: 'center' },
-  bulletList: { gap: theme.spacing.md },
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
-  bullet: { width: 7, height: 7, borderRadius: theme.radius.pill, backgroundColor: theme.colors.accent, marginTop: theme.spacing.sm },
   logoList: { gap: theme.spacing.md, paddingVertical: theme.spacing.xs },
   logoButton: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surfaceMuted, borderWidth: 1, borderColor: theme.colors.border },
   logoButtonSelected: { backgroundColor: theme.colors.accentSoft, borderWidth: 2, borderColor: theme.colors.accent },
@@ -574,9 +479,5 @@ const styles = StyleSheet.create({
   horizontalList: { gap: theme.spacing.md },
   watchCard: { width: 252, minHeight: 132, flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md, padding: theme.spacing.lg, borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
   watchIcon: { width: 40, height: 40, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.accentSoft },
-  eventCard: { width: 152, minHeight: 166, gap: theme.spacing.sm, padding: theme.spacing.lg, borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
-  dateBadge: { width: 58, height: 62, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.md, backgroundColor: theme.colors.accentSoft, borderWidth: 1, borderColor: theme.colors.accent },
-  textLink: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs },
-  linkText: { color: theme.colors.accent },
   pressed: { opacity: theme.opacity.pressed },
 });

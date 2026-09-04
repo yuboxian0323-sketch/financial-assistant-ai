@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppModal, AppText, Button, Card, Divider, EmptyState, LoadingSkeleton, Screen, SectionHeader, Tag } from '@/components';
+import { AppText, BulletList, Button, Card, ConfirmModal, Divider, EmptyState, LoadingSkeleton, MetadataRow, Screen, SectionHeader, Tag } from '@/components';
 import { TaskConfigurationEditor } from './TaskConfigurationEditor';
 import {
   useDeleteResearchTask,
@@ -14,6 +14,7 @@ import {
 } from '@/hooks/useAppQueries';
 import { theme } from '@/theme';
 import type { ResearchTaskDraft } from '@/types/domain';
+import { formatDateTime, titleCase } from '@/utils/format';
 
 export function ResearchTaskScreen() {
   const params = useLocalSearchParams<{ id?: string | string[]; edit?: string | string[] }>();
@@ -53,12 +54,12 @@ export function ResearchTaskScreen() {
       </View>
       <AppText tone="secondary">{task.description}</AppText>
       <Divider />
-      <Meta label="Schedule" value={task.scheduleLabel} />
-      <Meta label="Monitors" value={task.monitors.join(' · ')} />
-      {task.reportStyle ? <Meta label="Report style" value={formatStyle(task.reportStyle)} /> : null}
-      <Meta label="Last run" value={formatDate(task.lastRunAt, 'Not run yet')} />
-      <Meta label="Next local run" value={task.status === 'paused' ? 'Paused' : formatDate(task.nextRunAt, task.scheduleType === 'event' ? 'Waiting for event' : 'Not scheduled')} />
-      <Meta label="iPhone notification" value={task.delivery.notifyWhenReady ? 'When the report is ready' : 'Off'} />
+      <MetadataRow label="Schedule" value={task.scheduleLabel} />
+      <MetadataRow label="Monitors" value={task.monitors.join(' · ')} />
+      {task.reportStyle ? <MetadataRow label="Report style" value={titleCase(task.reportStyle)} /> : null}
+      <MetadataRow label="Last run" value={formatDateTime(task.lastRunAt, 'Not run yet')} />
+      <MetadataRow label="Next local run" value={task.status === 'paused' ? 'Paused' : formatDateTime(task.nextRunAt, task.scheduleType === 'event' ? 'Waiting for event' : 'Not scheduled')} />
+      <MetadataRow label="iPhone notification" value={task.delivery.notifyWhenReady ? 'When the report is ready' : 'Off'} />
       <AppText variant="caption" tone="muted">Times use your iPhone’s local timezone. Alert Center schedules a due reminder, while Notify when ready sends a banner after “Run now” finishes. Fully unattended AI execution still requires the secure scheduler deployment.</AppText>
     </Card>
 
@@ -81,14 +82,14 @@ export function ResearchTaskScreen() {
       {outputsQuery.isLoading ? <LoadingSkeleton preset="card" /> : output ? <Card elevated>
         <View style={styles.rowBetween}>
           <Tag label="Latest" tone="positive" />
-          <AppText variant="caption" tone="muted">{formatDate(output.generatedAt, '')}</AppText>
+          <AppText variant="caption" tone="muted">{formatDateTime(output.generatedAt, '')}</AppText>
         </View>
         <AppText variant="title">{output.title}</AppText>
         <AppText tone="secondary">{output.summary}</AppText>
         {output.sections.map((section) => <View key={section.title} style={styles.outputSection}>
           <Divider />
           <AppText variant="heading">{section.title}</AppText>
-          {section.bullets.map((bullet) => <View key={bullet} style={styles.bulletRow}><View style={styles.bullet} /><AppText tone="secondary" style={styles.flex}>{bullet}</AppText></View>)}
+          <BulletList items={section.bullets} />
         </View>)}
       </Card> : <EmptyState title="No output yet" description="Run this task to create its first research output." actionLabel="Run now" onAction={() => run.mutate(task.id)} />}
     </View>
@@ -99,37 +100,16 @@ export function ResearchTaskScreen() {
       <Button label="Delete task" variant="ghost" icon="trash-outline" onPress={() => setDeleteVisible(true)} />
     </Card>
 
-    <AppModal visible={deleteVisible} title="Delete research task?" onClose={() => setDeleteVisible(false)}>
-      <AppText tone="secondary">This removes the task and its latest output from this device. It cannot be undone.</AppText>
-      <Button label="Delete task" onPress={() => remove.mutate(task.id, { onSuccess: () => router.replace('/automations') })} loading={remove.isPending} />
-      <Button label="Keep task" variant="ghost" onPress={() => setDeleteVisible(false)} disabled={remove.isPending} />
-    </AppModal>
+    <ConfirmModal visible={deleteVisible} title="Delete research task?" description="This removes the task and its latest output from this device. It cannot be undone." confirmLabel="Delete task" cancelLabel="Keep task" loading={remove.isPending} onClose={() => setDeleteVisible(false)} onConfirm={() => remove.mutate(task.id, { onSuccess: () => router.replace('/automations') })} />
   </Screen>;
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return <View style={styles.meta}><AppText variant="caption" tone="muted">{label}</AppText><AppText style={styles.flex}>{value}</AppText></View>;
-}
-
-function formatDate(value: string | undefined, fallback: string): string {
-  if (!value) return fallback;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
-
-function formatStyle(value: string): string {
-  return value.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing.md },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  meta: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
   actions: { gap: theme.spacing.sm },
   section: { gap: theme.spacing.md },
   outputSection: { gap: theme.spacing.sm },
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
-  bullet: { width: 7, height: 7, marginTop: theme.spacing.sm, borderRadius: theme.radius.pill, backgroundColor: theme.colors.accent },
   error: { color: theme.colors.negative },
 });

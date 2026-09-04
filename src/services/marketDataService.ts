@@ -1,5 +1,6 @@
 import type { MarketDataService } from './contracts';
 import { AppError, type Company, type MarketIndex, type QuoteBatch, type StockHistory, type StockHistoryRange, type StockQuote, type StockSearchResult } from '@/types/domain';
+import { normalizeStockSymbols } from '@/utils/stocks';
 
 interface MarketQuoteResponse {
   quotes?: unknown;
@@ -43,10 +44,6 @@ function isStockQuote(value: unknown): value is StockQuote {
     && quote.source === 'Finnhub';
 }
 
-function normalizeSymbols(symbols: string[]): string[] {
-  return Array.from(new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))).sort();
-}
-
 function isStockSearchResult(value: unknown): value is StockSearchResult {
   if (!value || typeof value !== 'object') return false;
   const result = value as Record<string, unknown>;
@@ -72,12 +69,34 @@ function isStockHistory(value: unknown): value is StockHistory {
       && Number.isFinite((point as Record<string, unknown>).close));
 }
 
-function errorFromResponse(status: number, body: MarketQuoteResponse): AppError {
-  const message = typeof body.message === 'string' ? body.message : 'Live stock quotes are temporarily unavailable.';
+function errorFromResponse(status: number, body: MarketQuoteResponse, fallback: string): AppError {
+  const message = typeof body.message === 'string' ? body.message : fallback;
   if (status === 503 && body.code === 'MARKET_API_NOT_CONFIGURED') {
     return new AppError('CONFIGURATION', message, false);
   }
   return new AppError('NETWORK', message, status >= 500 || status === 429);
+}
+
+async function getMarketJson<T extends MarketQuoteResponse>(
+  fetchImpl: typeof fetch,
+  path: string,
+  messages: { network: string; unreadable: string; fallback: string; stale?: string },
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetchImpl(path, { headers: { Accept: 'application/json' } });
+  } catch {
+    throw new AppError('NETWORK', messages.network, true);
+  }
+  const contentType = response.headers?.get?.('content-type');
+  if (messages.stale && contentType && !contentType.includes('application/json')) {
+    throw new AppError('CONFIGURATION', messages.stale, false);
+  }
+  let body: T;
+  try { body = await response.json() as T; }
+  catch { throw new AppError('NETWORK', messages.unreadable, true); }
+  if (!response.ok) throw errorFromResponse(response.status, body, messages.fallback);
+  return body;
 }
 
 /** Creates a client for the server-side market proxy while keeping API credentials out of the app bundle. */
@@ -90,7 +109,7 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
 
   return {
     async getQuotes(inputSymbols: string[]): Promise<QuoteBatch> {
-      const symbols = normalizeSymbols(inputSymbols);
+      const symbols = normalizeStockSymbols(inputSymbols);
       if (!symbols.length) return { quotes: [], failedSymbols: [] };
 
       const now = Date.now();
@@ -102,23 +121,12 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
       const missingSymbols = symbols.filter((symbol) => !cachedSymbols.has(symbol));
       if (!missingSymbols.length) return { quotes: cachedQuotes, failedSymbols: [] };
 
-      let response: Response;
-      try {
-        const query = new URLSearchParams({ symbols: missingSymbols.join(',') });
-        response = await fetchImpl(`/api/market/quotes?${query.toString()}`, {
-          headers: { Accept: 'application/json' },
-        });
-      } catch {
-        throw new AppError('NETWORK', 'Could not reach the live stock quote service. Showing saved sample prices.', true);
-      }
-
-      let body: MarketQuoteResponse;
-      try {
-        body = await response.json() as MarketQuoteResponse;
-      } catch {
-        throw new AppError('NETWORK', 'The live stock quote service returned an unreadable response.', true);
-      }
-      if (!response.ok) throw errorFromResponse(response.status, body);
+      const query = new URLSearchParams({ symbols: missingSymbols.join(',') });
+      const body = await getMarketJson<MarketQuoteResponse>(fetchImpl, `/api/market/quotes?${query.toString()}`, {
+        network: 'Could not reach the live stock quote service. Showing saved sample prices.',
+        unreadable: 'The live stock quote service returned an unreadable response.',
+        fallback: 'Live stock quotes are temporarily unavailable.',
+      });
 
       const freshQuotes = Array.isArray(body.quotes) ? body.quotes.filter(isStockQuote) : [];
       const failedSymbols = Array.isArray(body.failedSymbols)
@@ -134,52 +142,28 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
       const cached = searchCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) return cached.results;
 
-      let response: Response;
-      try {
-        response = await fetchImpl(`/api/market/search?${new URLSearchParams({ q: query }).toString()}`, {
-          headers: { Accept: 'application/json' },
-        });
-      } catch {
-        throw new AppError('NETWORK', 'Could not reach the stock search service.', true);
-      }
-
-      let body: MarketSearchResponse;
-      try {
-        body = await response.json() as MarketSearchResponse;
-      } catch {
-        throw new AppError('NETWORK', 'The stock search service returned an unreadable response.', true);
-      }
-      if (!response.ok) throw errorFromResponse(response.status, body);
+      const body = await getMarketJson<MarketSearchResponse>(fetchImpl, `/api/market/search?${new URLSearchParams({ q: query }).toString()}`, {
+        network: 'Could not reach the stock search service.',
+        unreadable: 'The stock search service returned an unreadable response.',
+        fallback: 'Stock search is temporarily unavailable.',
+      });
       const results = Array.isArray(body.results) ? body.results.filter(isStockSearchResult) : [];
       searchCache.set(cacheKey, { results, expiresAt: Date.now() + 5 * 60_000 });
       return results;
     },
     async getHistory(inputSymbol: string, range: StockHistoryRange): Promise<StockHistory> {
-      const symbol = normalizeSymbols([inputSymbol])[0];
+      const symbol = normalizeStockSymbols([inputSymbol])[0];
       if (!symbol) throw new AppError('SERVICE', 'Choose a valid stock for the chart.', false);
       const cacheKey = `${symbol}:${range}`;
       const cached = historyCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) return cached.history;
 
-      let response: Response;
-      try {
-        response = await fetchImpl(`/api/market/history?${new URLSearchParams({ symbol, range }).toString()}`, {
-          headers: { Accept: 'application/json' },
-        });
-      } catch {
-        throw new AppError('NETWORK', 'Could not reach the historical price service.', true);
-      }
-      let body: MarketHistoryResponse;
-      const contentType = response.headers?.get?.('content-type');
-      if (contentType && !contentType.includes('application/json')) {
-        throw new AppError('CONFIGURATION', 'The Expo server is stale. Restart Expo with --clear to load the chart route.', false);
-      }
-      try {
-        body = await response.json() as MarketHistoryResponse;
-      } catch {
-        throw new AppError('NETWORK', 'The historical price service returned an unreadable response.', true);
-      }
-      if (!response.ok) throw errorFromResponse(response.status, body);
+      const body = await getMarketJson<MarketHistoryResponse>(fetchImpl, `/api/market/history?${new URLSearchParams({ symbol, range }).toString()}`, {
+        network: 'Could not reach the historical price service.',
+        unreadable: 'The historical price service returned an unreadable response.',
+        fallback: 'Historical prices are temporarily unavailable.',
+        stale: 'The Expo server is stale. Restart Expo with --clear to load the chart route.',
+      });
       if (!isStockHistory(body.history)) throw new AppError('SERVICE', 'The historical price service returned invalid chart data.', true);
       historyCache.set(cacheKey, { history: body.history, expiresAt: Date.now() + (range === '1H' || range === '1D' ? 60_000 : 5 * 60_000) });
       return body.history;
@@ -190,7 +174,7 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
 /** Keeps tests and fully offline startup deterministic when no remote adapter is supplied. */
 export function createOfflineMarketDataService(): MarketDataService {
   return {
-    getQuotes: async (symbols) => ({ quotes: [], failedSymbols: normalizeSymbols(symbols) }),
+    getQuotes: async (symbols) => ({ quotes: [], failedSymbols: normalizeStockSymbols(symbols) }),
     searchStocks: async () => [],
     getHistory: async () => { throw new AppError('CONFIGURATION', 'Historical prices are unavailable offline.', false); },
   };
