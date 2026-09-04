@@ -12,11 +12,7 @@ Instead of separating company data, market news, research notes, AI tools, and t
 
 ## Demo
 
-<!-- Replace with your demo video / GIF -->
-
-![FI AI Demo](./assets/demo.gif)
-
-**Discover → Research → Organize → Act**
+[▶ Watch the FI AI Demo]([YOUR_VIDEO_LINK](https://drive.google.com/file/d/1t6pCjc9P64vpKWa7eiOWUKxk7XdUDoeK/view?usp=sharing))
 
 ---
 
@@ -176,32 +172,6 @@ This project has also given me experience designing requirements precise enough 
 
 ---
 
-## Engineering Challenges
-
-### Reusable Research Interfaces
-
-One of the core design challenges is separating the **structure of a user's research workspace** from the **company being researched**.
-
-The workspace must preserve how the user prefers to organize research while allowing its content to change when the user moves between stocks.
-
----
-
-### Managing Different Types of State
-
-FI AI contains multiple categories of state, including persistent application data, asynchronously loaded information, and temporary interface state.
-
-The project uses SQLite, TanStack Query, and Zustand for different responsibilities rather than relying on a single state-management approach.
-
----
-
-### Designing AI Around a Workflow
-
-FI AI treats AI as part of a larger research process rather than simply adding a chat interface.
-
-The product is designed around connecting AI assistance with company research, workspaces, and tasks so generated information can become part of an organized workflow.
-
----
-
 ## Project Status
 
 FI AI is an **independent project under active development**.
@@ -221,74 +191,11 @@ Some functionality described in this README represents features that are activel
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-Make sure you have:
-
-- Node.js
-- npm
-- Expo Go or a compatible simulator
-
-### Installation
-
-Clone the repository:
-
-```bash
-git clone <YOUR_REPOSITORY_URL>
-cd <YOUR_REPOSITORY_NAME>
-```
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start the development server:
-
-```bash
-npx expo start
-```
-
-Follow the Expo instructions to launch FI AI using Expo Go or a simulator.
-
----
-
-## Testing
-
-Run the test suite with:
-
-```bash
-npm test
-```
-
-Lint the project with:
-
-```bash
-npm run lint
-```
-
----
-
 ## Roadmap
 
 FI AI is continuing to evolve toward a more complete personalized investment research environment.
 
 Future development will focus on deeper financial-data integration, expanded research modules, improved AI-assisted workflows, and continued refinement of the customizable workspace experience.
-
----
-
-## About the Project
-
-FI AI started with a simple question:
-
-> **What if investment software adapted to how you research?**
-
-The project combines my interests in **software engineering, artificial intelligence, investing, and product design**.
-
-Beyond building the application itself, FI AI has become an exploration of how customizable interfaces, structured research workflows, and AI-assisted software can work together to improve the investment research experience.
 
 ---
 
